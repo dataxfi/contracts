@@ -1,6 +1,5 @@
 pragma solidity >=0.8.0 <0.9.0;
 //SPDX-License-Identifier: BSU-1.1
-
 import "../Base.sol";
 import "../interfaces/IUniV2Adapter.sol";
 import "../interfaces/IBPool.sol";
@@ -39,10 +38,22 @@ contract TradeRouter is Base {
         );
     }
 
-    function swapExactETHToDatatoken() external payable {}
+  
 
     //TODO : function swap ERC20 to exact DT
-    function swapTokenToExactDatatoken() external {}
+    function swapTokenToExactDatatoken(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external  payable{
+        // conversion
+        uint256 amounts = adapter.swapExactTokensForTokens(AmountIn, amountOutMin, path, to, deadline);
+        // then converting the given ocean to dataToken
+
+
+    }
 
     //TODO : function swap exact ERC20 To DT
     function swapExactTokenToDatatoken() external {}
