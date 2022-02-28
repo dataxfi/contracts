@@ -2,9 +2,11 @@ pragma solidity >=0.8.0 <0.9.0;
 //SPDX-License-Identifier: BSU-1.1
 
 import "../interfaces/IStorage.sol";
-import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+import "../interfaces/IUniswapV2Router02.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/access/ownable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract UniV2Adapter is IStorage {
     IUniswapV2Router02 public uniswapRouter;
@@ -23,9 +25,10 @@ contract UniV2Adapter is IStorage {
 
     modifier availableAmt(uint256 amountOut) {
         require(msg.value > amountOut, "balance-insufficient");
+        _;
     }
 
-    function setVersionInStorage() onlyOwner {
+    function setVersionInStorage() public onlyOwner {
         return
             reg.upgradeContractAddresses(
                 keccak256("currentVersionAdapter", currentVersion),
