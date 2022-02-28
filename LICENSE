@@ -7,16 +7,14 @@ License text copyright (c) 2017 MariaDB Corporation Ab, All Rights Reserved.
 
 Parameters
 
-Licensor:             DataX Finance
+Licensor:             DataX Protocol
 
-Licensed Work:        DataX Finance Core Smart Contracts 
-                      The Licensed Work is (c) 2022 DataX Finance
-                      
-Additional Use Grant: 
+Licensed Work:        DataX Protocol Core Smart Contracts 
+                      The Licensed Work is (c) 2022 DataX Protocol
 
-Change Date:          
+Change Date:          2024-12-31
 
-Change License:       GNU General Public License v2.0 or later
+Change License:       Apache v2.0
 
 -----------------------------------------------------------------------------
 
@@ -74,10 +72,10 @@ In consideration of the right to use this License’s text and the "Business
 Source License" name and trademark, Licensor covenants to MariaDB, and to all
 other recipients of the licensed work to be provided by Licensor:
 
-1. To specify as the Change License the GPL Version 2.0 or any later version,
-   or a license that is compatible with GPL Version 2.0 or a later version,
+1. To specify as the Change License the Apache Version 2.0 or any later version,
+   or a license that is compatible with Apache Version 2.0 or a later version,
    where "compatible" means that software provided under the Change License can
-   be included in a program with software provided under GPL Version 2.0 or a
+   be included in a program with software provided under Apache Version 2.0 or a
    later version. Licensor may specify additional Change Licenses without
    limitation.
 
