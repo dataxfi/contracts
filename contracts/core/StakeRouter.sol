@@ -1,24 +1,20 @@
 pragma solidity >=0.8.0 <0.9.0;
 //SPDX-License-Identifier: BSU-1.1
-
 import "../Base.sol";
-import "../interfaces/IUniV2Adapter.sol";
-import "../interfaces/IBPool.sol";
-import "@openzeppelin/contracts/tokens/ERC20/IERC20.sol";
-import "../interfaces/IStorage.sol";
-import "../interfaces/ICommunityFeeCollector.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/tokens/ERC20/IERC20.sol";
-import "../interface/IStorage.sol";
-contract TradeRouter is Base , ICommunityFeeCollector,IUniswapV2Adapter , IStorage{
+import "../interfaces/IPool.sol";
+
+contract StakeRouter is Base , ICommunityFeeCollector,IUniswapV2Adapter , IStorage{
     using SafeMath for uint256;
     IUniV2Adapter adapter;
     ICommunityFeeCollector collector;
+    address public dtpoolAddress
+    // parameter constant for fees and 
     uint256 public communityFee;
-    uint public currentVersionTR;
-    uint256 public tradingFees;
-    constructor(address adapterAddress , address dtpoolAddress , uint _version , uint _fees,address  _StorageAddress, address _collectorAddress , address _tokenOcean ) {
+   
+    uint public currentVersionSR;
+      
+    constructor(address adapterAddress , address _dtpoolAddress , uint _version , uint _fees ,address  _StorageAddress, address _collectorAddress , address _tokenOcean ) {
+       dtpoolAddress = _dtpoolAddress;
         adapter = IUniV2Adapter(adapterAddress);
         IBPool dtpool = IBPool(dtPoolAddress);
         IStorage reg = IStorage(_StorageAddress);
@@ -41,113 +37,75 @@ contract TradeRouter is Base , ICommunityFeeCollector,IUniswapV2Adapter , IStora
         return(currentVersionTR);
     }
 
-    // TODO: for now an single parameter , but can be created an array for finetuning the values
+    function setAddress() public onlyGov {
+return reg.upgradeContractAddresses(keccak256("versionTR", currentVersionTR),address(this));
+        
+    }
+
+    // @dev : sets the counter
     function setCommunityFees(uint _fees ) public onlyGov {
         communityFee = _fees;
     }
     // @dev : address receiving the fees from the swapping operation
-    function setCollector(address payable _feeCollector) public {
+    function setCollector(address payable _feeCollector) onlyGov public {
         require(collector.changeCollector(_feeCollector), "permission denied");
     }
   
     //@dev wrapper contract for storing the current version of TR with the corresponding address 
     function setVersionInStorage() public onlyOwner {
-        return reg.upgradeContractAddresses(keccak256("versionTR", currentVersionTR),address(this));
+        return reg.upgradeContractAddresses(keccak256("versionSR", currentVersionSR),address(this));
     }
 
-    /** @dev allows the swap between ETH to data token 
-     @dev here we will follow tokens --> exact tokens --> exact DT and only swaps on the single side liquidity 
-     just the difference is for the ETH we have the different function
-    // @Param amountsOut = amount of data token needed .
-    // and given the path is addr["WETH","OceanAddr","DTAddress"]. */
-    function swapETHToExactDatatoken(
+    /**  @dev : swaps the value of ETH to exact data token with the path ETH  --> exact tokens --> exact DT
+     and only swaps on the single side liquidity 
+     @Param amountsOut = amount of data token needed .
+    @param  path is addr["ERC20TokenAddress","OceanAddr","DTAddress"]. 
+    @ dataToken is the address of the dt which is also called baseToken for the pool contract
+    */
+    function StakeERC20inDP(
         uint256  tokenamountsOut,
         address[] calldata path,
         address datatoken,
-        uint256 deadline
+        uint256 deadline,
+        uint256[] amountsOut,
     ) external __lock__ payable returns(uint256 memory DToken_results)
      {
-        // convert ETH to Ocean
-        uint256 amountsOcean = adapter.swapETHtoExactTokens(
-            amountsOut[0],
+
+
+
+        // converting the given ERC20 into the dataToken for staking 
+        adapter.swapExactTokenstoDataToken(
+            dtpooladdress,
+            amountsOut,
             path,
-            deadline
+            100
         );
-
-
-        address oceanToken = path[1];
-        // convert Ocean to  exact Datatokens 
-        //1. trying to determine the exactOcean tokens needed and the corresponding fees for getting the specific tokenAmounts out
-        uint256[4] details = dtpool.getAmountInExactOut(path[1], path[2], tokenamountsOut, dtpool.getSwapFee());
-        // thus necessary amounts of ocean needed.
-        uint256 amountsOcean =  details[0];
-       
-       uint256 feesCollector =  getCommunityFees();
-        uint256 OceanAmountSwapped =  sub(amountsOcean, feesCollector);
-        IERC20(oceanToken).safeTransferFrom(oceanToken, feeCollector,  feesCollector);
-        
-        /*
+        address dtaddress = path[path.length - 1];
+        // now then sending the out amounts (DT's base tokens) from the given contract to the address
+        uint256 balanceOfToken = IERC20(pathAddress).BalanceOf(dtaddress);
+        adapter.joinswapExternAmountIn(
+            balanceOfToken,
+            10000000000
         );
-        */
-        // now providing the parameters
-        //  
-        // array of addresses : tokenIn, tokenOut , marketfeeAddress
-        address[3] tokenInOutMarket = [path[1], path[2],communityFeeCollector];
-        //@param amountsInOutMaxFee array of ints: [maxAmountIn,tokenAmountOut,maxPrice, consumeMarketSwapFee]
-        address[4] amountsInOutMaxFee = [OceanAmountSwapped, tokenamountsOut, 0,0 ];
-        uint256[2] DToken_results =  dtpool.swapExactAmountOut(
-           tokenInOutMarket,
-           amountsInOutMaxFee
-        );
+        // finally   sending some ERC20  tokens as collector  fees after the operation. 
+        collector.withdrawTokens(path[2]);
 
-        require(DToken_results[0], "swap unsuccessful");
     }
-
-
-    //TODO : function swap ERC20 to exact DT
-    function swapTokenToExactDatatoken(
-        uint256  tokenamountsOut,
-        address[] calldata path,
-        address datatoken
+    //TODO : Stake DT in DataPools
+    /**
+    path 
+    
+     */
+    function StakeDTInDatapools(
+       address[] path
+       uint256 tokenAmountIn,
+       uint
     ) external  __lock__ payable{
-        //  
-    uint256 amountsOcean = adapter.swapTokentoExactTokens(
-            amountsOut[0],
-            path,
-            deadline
-        );
+        //  durectly calling the function for adding single side liquidity from the base token .
+    dtpool.joinswapExternAmountIn()
 
-
-        address oceanToken = path[1];
-        // convert Ocean to  exact Datatokens 
-        //1. trying to determine the exactOcean tokens needed and the corresponding fees for getting the specific tokenAmounts out
-        uint256[4] details = dtpool.getAmountInExactOut(path[1], path[2], tokenamountsOut, dtpool.getSwapFee());
-        // thus necessary amounts of ocean needed.
-        uint256 amountsOcean =  details[0];
-       
-       uint256 feesCollector =  getCommunityFees();
-        uint256 OceanAmountSwapped =  sub(amountsOcean, feesCollector);
-        IERC20(oceanToken).safeTransferFrom(oceanToken, feeCollector,  feesCollector);
-        
-        /*
-        );
-        */
-        // now providing the parameters
-        // array of addresses : tokenIn, tokenOut , marketfeeAddress
-        address[3] tokenInOutMarket = [path[1], path[2],communityFeeCollector];
-        //@param amountsInOutMaxFee array of ints: [maxAmountIn,tokenAmountOut,maxPrice, consumeMarketSwapFee]
-        address[4] amountsInOutMaxFee = [OceanAmountSwapped, tokenamountsOut, 0,0 ];
-        uint256[2] DToken_results =  dtpool.swapExactAmountOut(
-           tokenInOutMarket,
-           amountsInOutMaxFee
-        );
-
-        require(DToken_results[0], "swap unsuccessful");
     }
-
-
-
-    function swapExactDatatokenforETH(
+    function UnstakeERC20inDP(
         uint256 ExactDataTokenIn,
         uint256 minAmountOut,
         address[] calldata path,
@@ -170,59 +128,20 @@ contract TradeRouter is Base , ICommunityFeeCollector,IUniswapV2Adapter , IStora
        0
         );
 
+    // TODO: unstaking fees is required to be seperate rate to be deducted. 
+
     }
 
-    //TODO : function swap DT to exact ERC20
-    function swapDatatokentoExactToken(
+    //TODO :double liquidity exit . 
+    function UnstakeERC20DTandDP(
        uint256 ExactDataTokenIn,
         uint256 minAmountOut,
         address[] calldata path,
         address datatoken,
         uint256 deadline
     ) external {
-        // flow : DT unstaked --> oceanToken --> ExactTokens 
-        address erc20tokenOut = path[path.length - 1];
-       dtpool.exitswapPoolAmountIn(
-           ExactDataTokenIn,
-           dtpool.getAmountOutExactIn(datatoken, path[path.length-1],0),
-       );
-    // now getting the same fees .
-    
-    
-    
-    }
-
-    //TODO : function swap exact DT to ERC20
-    function swapExactDatatokenToToken() external {
-        //flow : similar but with tokens 
 
     }
-
-
-    function swapDataTokenForExactTokens(
-        address 
-
-
-    ) externals returns(uint256 amountsOutIn)
-
-
-
-
-    // @dev: this will be recursive call of SwapToken
-    function swapDatatokenforDataToken(
-        address datatokenIn,
-        address amountInMax,
-        address dataTokenOut,
-    ) external returns (uint256 amountsDataOutMin) {
-        swapDatatokenForExactTokens();
-        swapExactTokenstoDataToken();
-
-
-    }
-
-
-
-
 
 
 
