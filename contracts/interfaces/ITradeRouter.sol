@@ -40,7 +40,7 @@ interface ITradeRouter {
         address[] calldata path,
         address to,
         uint256 refFees,
-        uint256 refAddress,
+        address refAddress,
         uint256 deadline
     ) external;
 
@@ -57,7 +57,7 @@ interface ITradeRouter {
         address[] calldata path,
         address to,
         uint256 refFees,
-        uint256 refAddress,
+        address refAddress,
         uint256 deadline
     ) external;
 
@@ -76,7 +76,7 @@ interface ITradeRouter {
         address[] calldata path,
         address to,
         uint256 refFees,
-        uint256 refAddress,
+        address refAddress,
         uint256 deadline
     ) external;
 
@@ -95,7 +95,7 @@ interface ITradeRouter {
         address[] calldata path,
         address to,
         uint256 refFees,
-        uint256 refAddress,
+        address refAddress,
         uint256 deadline
     ) external;
 
@@ -114,7 +114,7 @@ interface ITradeRouter {
         address[] calldata path,
         address to,
         uint256 refFees,
-        uint256 refAddress,
+        address refAddress,
         uint256 deadline
     ) external;
 
@@ -133,7 +133,7 @@ interface ITradeRouter {
         address[] calldata path,
         address to,
         uint256 refFees,
-        uint256 refAddress,
+        address refAddress,
         uint256 deadline
     ) external;
 
@@ -152,7 +152,7 @@ interface ITradeRouter {
         address[] calldata path,
         address to,
         uint256 refFees,
-        uint256 refAddress,
+        address refAddress,
         uint256 deadline
     ) external;
 }
