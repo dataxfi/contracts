@@ -1,7 +1,7 @@
 pragma solidity >=0.8.0 <0.9.0;
 // SPDX-License-Identifier: BSU-1.1
-import "../interfaces/IERC20.sol";
-import "./Base.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../Base.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
@@ -31,10 +31,13 @@ contract CommunityFeeCollector is Ownable, Base {
 
     /**
      * @dev fallback function
-     *      this is a default fallback function in which receives
-     *      the collected ether.
      */
     fallback() external payable {}
+
+    /**
+     * @dev receive ETH
+     */
+    receive() external payable {}
 
     /**
      * @dev withdrawETH
@@ -56,9 +59,9 @@ contract CommunityFeeCollector is Ownable, Base {
         );
 
         require(
-            IERC20Template(tokenAddress).transfer(
+            IERC20(tokenAddress).transfer(
                 collector,
-                IERC20Template(tokenAddress).balanceOf(address(this))
+                IERC20(tokenAddress).balanceOf(address(this))
             ),
             "CommunityFeeCollector: failed to withdraw tokens"
         );
