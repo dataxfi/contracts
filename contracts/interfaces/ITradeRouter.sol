@@ -1,75 +1,158 @@
-pragma solidity ^0.8.9;
+pragma solidity >=0.8.0 <0.9.0;
 
+//SPDX-License-Identifier: BSU-1.1
 
+/** @notice : interface to swap between erc20 tokens and datatokens
+ */
 interface ITradeRouter {
-/* @dev  get current version  number for the contract
-*/
-function getCurrentVersion() external view returns(uint);
-/* @dev  get the constant fees being transferred to the controller after the  swap.
-*/
-function getSwapFees() external view returns(uint256);
-/* @dev sets the new address for withdrawing the remaining tokens after swap and transfer to the user.
-@param _feeCollector new address of wallet for getting fees in native token.
-*/
-function setCollector(address payable _feeCollector) external ;
+    /** @dev  get current version  number for the contract
+     */
+    function getCurrentVersion() external view returns (uint256);
 
-/* set the parameter for arbitrary uint parameters (version , controller fees ...) for the functions in the contract.
-@param variable_name  will be the  name of the  contract parameters that you want to store.  the accepted values for now : "swapFees", "Version"
-@param value  the value corresponding to the parameter that you want to set.
-*/
-function setParameterUint(string memory variable_name ,  uint256 value) external;
-/* swaps the  ETH from the caller function to dataTokens and transfers back  the user minus the swap fee (to collector)
-@param amountOut fixed number of data tokens you want ot be swapped
-@param path array of  addresses defining the liquidity path taken for swapping.
-@param dstAddress is the destination address (user primarily) for getting the destination token .
-@param deadline is the time in sec during the time AMM functions search for the corresponding orders to fill the order.(generally kept 30 to 60 max) 
-*/
-function swapETHforExactDataToken( uint  amountOut,  address[] calldata path, address dstAddress,  uint deadline)  external;
-/* swaps the given amount of ETH denominated to be converted to the data token 
-@param amountOutMin is the min amount of the exact DT  that are swapped before returning the remaining in case of deadline passed
-@param path array of  addresses defining the liquidity path taken for swapping.
-@param dstAddress is the destination address (user/third party contracts) for getting the destination token .
-@param deadline is the time in sec during the time AMM functions search for the corresponding orders to fill the order.(generally kept 30 to 60 max) 
+    /** @dev  get the constant fees being transferred to the collector after the swap.
+     */
+    function getSwapFees() external view returns (uint256);
 
-*/
-function swapExactETHforDataToken( uint amountOutMin, address[] calldata path, address dstAddress, uint deadline) external;
+    /** @dev sets the new address for withdrawing the remaining tokens after swap and transfer to the user.
+    @param _feeCollector new address of wallet for getting fees in native token.
+    */
+    function setCollector(address payable _feeCollector) external;
 
-/** swaps the exact Amount of input tokens  to given  data Token
-@param amountIn exact amount of ERC20 that you want to swap 
-@param amountOutMin min threashold swap amount result in order to get result.
-@param path is the address array for the swap path based on liquidity.
-@param dstAddress is the destination address (user/third party contracts) for getting the destination token .
-@param deadline is the time in sec during the time AMM functions search for the corresponding orders to fill the order.(generally kept 30 to 60 max) 
+    /** @dev set the parameter for arbitrary uint parameters (version , community fees ...) for the functions in the contract.
+    @param variable_name  will be the  name of the  contract parameters that you want to store.  the accepted values for now : "swapFees", "Version"
+    @param value  the value corresponding to the parameter that you want to set.
+    */
+    function setParameterUint(string memory variable_name, uint256 value)
+        external;
 
- */
-function swapExactTokensforDataToken( uint amountIn, uint amountOutMin,address[] calldata path, address to, uint deadline ) external;
+    /** @dev Swaps given max amount of ETH (native token) to datatokens
+    @param amountOut is the exact amount of datatokens you want to be receive
+    @param amountInMax is the max amount of ETH you want to spend
+    @param path is the address array for the swap path based on liquidity
+    @param to is the destination address for receiving destination token
+    @param refFees is the referral fees paid to external dapps
+    @param refAddress is the address where referral fees are paid to
+    @param deadline is the max time in sec during which order must be filled
+     */
+    function swapETHforExactDatatokens(
+        uint256 amountOut,
+        uint256 amountInMax,
+        address[] calldata path,
+        address to,
+        uint256 refFees,
+        uint256 refAddress,
+        uint256 deadline
+    ) external;
 
-/** swaps the exact Amount of data tokens  to arbitrary amount of data tokens defined by dynamic exchange ratio
-@param amountIn exact amount of dataToken that you want to swap 
-@param amountOutMin min threshold swap amount of DT before capitulation of deadline.
-@param path is the address array for the swap path based on liquidity.
-@param dstAddress is the destination address (user/third party contracts) for getting the destination token .
-@param deadline is the time in sec during the time AMM functions search for the corresponding orders to fill the order.(generally kept 30 to 60 max) 
+    /** @dev Swaps exact amount of ETH (native token) to datatokens
+    @param amountOutMin is the min amount of datatokens you want to receive
+    @param path is the address array for the swap path based on liquidity
+    @param to is the destination address for receiving destination token
+    @param refFees is the referral fees paid to external dapps
+    @param refAddress is address where referral fees are paid to
+    @param deadline is the max time in sec during which order must be filled
+     */
+    function swapExactETHforDataTokens(
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 refFees,
+        uint256 refAddress,
+        uint256 deadline
+    ) external;
 
- */
-function swapExactDataTokensforDataTokens (uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external;
+    /** @dev Swaps exact amount of datatokens to ETH (native token)
+    @param amountIn is the exact amount of datatokens you want to spend 
+    @param amountOutMin is the min amount of ETH you want to receive
+    @param path is the address array for the swap path based on liquidity
+    @param to is the destination address for receiving destination token
+    @param refFees is the referral fees paid to external dapps
+    @param refAddress is address where referral fees are paid to
+    @param deadline is the max time in sec during which order must be filled
+     */
+    function swapExactDatatokensforETH(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 refFees,
+        uint256 refAddress,
+        uint256 deadline
+    ) external;
 
+    /** @dev Swaps given max amount of erc20 tokens to datatokens
+    @param amountOut is the exact amount of Datatokens you want to be receive
+    @param amountInMax is the max amount of erc20 tokens you want to spend
+    @param path is the address array for the swap path based on liquidity
+    @param to is the destination address for receiving destination token
+    @param refFees is the referral fees paid to external dapps
+    @param refAddress is the address where referral fees are paid to
+    @param deadline is the max time in sec during which order must be filled
+     */
+    function swapTokensforExactDatatokens(
+        uint256 amountOut,
+        uint256 amountInMax,
+        address[] calldata path,
+        address to,
+        uint256 refFees,
+        uint256 refAddress,
+        uint256 deadline
+    ) external;
 
-/**swaps exact amount of dataTokens to the resulting amount of ETH tokens  
+    /** @dev Swaps exact amount of erc20 tokens to datatokens
+    @param amountIn is the exact amount of erc20 tokens you want to spend 
+    @param amountOutMin is the min amount of datatokens you want to receive
+    @param path is the address array for the swap path based on liquidity
+    @param to is the destination address for receiving destination token
+    @param refFees is the referral fees paid to external dapps
+    @param refAddress is address where referral fees are paid to
+    @param deadline is the max time in sec during which order must be filled
+     */
+    function swapExactTokensforDataTokens(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 refFees,
+        uint256 refAddress,
+        uint256 deadline
+    ) external;
 
+    /** @dev Swaps exact amount of datatokens to erc20 tokens
+    @param amountIn is the exact amount of datatokens you want to spend 
+    @param amountOutMin is the min amount of erc20 tokens you want to receive
+    @param path is the address array for the swap path based on liquidity
+    @param to is the destination address for receiving destination token
+    @param refFees is the referral fees paid to external dapps
+    @param refAddress is address where referral fees are paid to
+    @param deadline is the max time in sec during which order must be filled
+     */
+    function swapExactDatatokensforDatatokens(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 refFees,
+        uint256 refAddress,
+        uint256 deadline
+    ) external;
 
- */
-
-function swapExactDataTokensforETH(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external;
-
-/**
-get exact amount of swapped dataToken given initial amount of another  dataToken.
- */
-
-
-
-function swapDataTokenforExactDataToken( uint amountOut, uint amountInMax, address[] calldata path, address to,uint deadline) external;
-
-
-
+    /** @dev Swaps given max amount of datatokens to exact datatokens
+    @param amountOut is the exact amount of datatokens you want to be receive
+    @param amountInMax is the max amount of datatokens you want to spend
+    @param path is the address array for the swap path based on liquidity
+    @param to is the destination address for receiving destination token
+    @param refFees is the referral fees paid to external dapps
+    @param refAddress is the address where referral fees are paid to
+    @param deadline is the max time in sec during which order must be filled
+     */
+    function swapDatatokensforExactDatatokens(
+        uint256 amountOut,
+        uint256 amountInMax,
+        address[] calldata path,
+        address to,
+        uint256 refFees,
+        uint256 refAddress,
+        uint256 deadline
+    ) external;
 }
