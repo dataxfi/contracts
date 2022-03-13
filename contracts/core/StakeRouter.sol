@@ -50,8 +50,9 @@ contract StakeRouter is   IStakeRouter , Base {
         collector.changeCollector(newAddress);
     }
 
-    function setParamUint(bytes32 key, uint256 value, string parameterName ) public onlyGov {
-       reg.updateParam (key, value);
+    function setParamUint(uint256 value, string parameterName ) public onlyGov {
+       bytes32 key = keccak256("parameterName", currentVersionSR);
+       reg.updateParam(key, value);
     }
     
     // @dev : address receiving the fees from the swapping operation
