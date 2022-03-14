@@ -86,4 +86,8 @@ interface IUniV2Adapter {
         uint256 deadline
     ) external returns (uint256 amountsOut);
 
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> c43e723b4bf04d482edf84a43efe7a910b82c436
