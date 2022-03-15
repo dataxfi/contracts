@@ -4,7 +4,7 @@ pragma solidity >=0.8.0 <0.9.0;
 
 interface IUniV2Adapter {
 /**set the  current  version of the contract in Storage lookup */
-    function setVersionInStorage() public returns;
+    function setVersionInStorage() external view ;
 
 
 /** 
@@ -51,7 +51,7 @@ interface IUniV2Adapter {
         address to,
         uint256 deadline
     ) external payable
-        returns (uint256 memory amountsOut);
+        returns (uint256  amountsOut);
 
 
 
@@ -86,8 +86,5 @@ interface IUniV2Adapter {
         uint256 deadline
     ) external returns (uint256 amountsOut);
 
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> c43e723b4bf04d482edf84a43efe7a910b82c436
+

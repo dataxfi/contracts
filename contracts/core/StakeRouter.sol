@@ -1,4 +1,4 @@
-pragma solidity >=0.8.0 <0.9.0;
+pragma solidity ^0.8.5;
 //SPDX-License-Identifier: BSU-1.1
 import "../Base.sol";
 import "../interfaces/IPool.sol";
@@ -7,9 +7,9 @@ import "../interfaces/ICommunityFeeCollector.sol";
 import "../interfaces/IUniV2Adapter.sol";
 import "../interfaces/IStakeRouter.sol";
 import "../interfaces/IStorage.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "../interfaces/ITradeRouter.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol"
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 // contract by ocean for finding the details about the data tokens being staked in the pools.
 import "../interfaces/IBfactory.sol";
 contract StakeRouter is   IStakeRouter , Base {
@@ -20,7 +20,7 @@ contract StakeRouter is   IStakeRouter , Base {
     IStorage reg ;
     IBFactory balancerFac;
     IPool BPool;
-    // current version of stakerouter (also stored  in the storage, but still used for  direct lookup).
+    address private   OwnerAddress;
     uint public currentVersionSR;
  constructor(address adapterAddress, address Bfactory, address BPool ,  uint _version , uint _fees ,address  _StorageAddress, address _collectorAddress , address _tokenOcean ) {
         adapter = ITradeRouter(adapterAddress);
@@ -35,11 +35,12 @@ contract StakeRouter is   IStakeRouter , Base {
         currentVersionSR = _version;
         // set also the stakeRouter address in the storage
         reg.updateContractAddress(keccak256("StakeRouter", _version), address(this));
+        OwnerAddress = address(msg.sender);
         
         }
 // only owner(or the multisig from the gov) will be operating on the following functions.
     modifier onlyGov {
-        require(msg.sender == Owner());
+        require(msg.sender == OwnerAddress);
     _;
     }
     
@@ -106,7 +107,7 @@ function StakeERC20toDT(address dtpoolAddress,address amountIn,  uint256[] calld
         IERC20.safeTransferFrom(dtaddress,refStakingAddress, address(this), refStakingFees);
 
         // and then approving the collector to transfer the amount 
-        uint256 totalAmount =  IERC20(dtaddress).balanceOf(address(this))
+        uint256 totalAmount =  IERC20(dtaddress).balanceOf(address(this));
         IERC20.safeApprove(dtaddress, _collectorAddress, totalAmount);
         collector.withdrawTokens(dtaddress);
 
@@ -117,6 +118,8 @@ function StakeERC20toDT(address dtpoolAddress,address amountIn,  uint256[] calld
      */
 function StakeETHtoDT(address dtpoolAddress, uint256 amountDTOut, address[] calldata path, address datatoken, uint256 deadline, address refStakingAddress, uint256 refStakingFees) public payable _lock_ {
     adapter.swapETHForExactTokens(amountDTOut, path, deadline, address(this));
+
+    address dtaddress = datatoken;
 
     require(balancerFac.isOceanToken(datatoken), "StakeRouter::WrongAddress() wrong token supplied, check whitelisted tokens again");
     
@@ -131,7 +134,7 @@ function StakeETHtoDT(address dtpoolAddress, uint256 amountDTOut, address[] call
 
     IERC20.safeTransferFrom(datatoken,refStakingAddress, address(this), refStakingFees);
 
-    uint256 totalAmount =  IERC20(dtaddress).balanceOf(address(this))
+    uint256 totalAmount =  IERC20(dtaddress).balanceOf(address(this));
         IERC20.safeApprove(dtaddress, _collectorAddress, totalAmount);
         collector.withdrawTokens(dtaddress);
 }
@@ -156,7 +159,7 @@ function StakeDTtoDT(address dtpoolAddress, uint256 amountDTOut, uint256 amountD
 
     IERC20.safeTransferFrom(datatoken,refStakingAddress, address(this), refStakingFees);
 
-    uint256 totalAmount =  IERC20(dtaddress).balanceOf(address(this))
+    uint256 totalAmount =  IERC20(dtaddress).balanceOf(address(this));
         IERC20.safeApprove(dtaddress, _collectorAddress, totalAmount);
         collector.withdrawTokens(dtaddress);
 
@@ -267,7 +270,7 @@ providing revert txn possiblity in case of txn revert .
     /**
      * @dev receive ETH
      */
-    receive() external payable {}
+receive() external payable {}
 
 
 }
