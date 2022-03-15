@@ -81,19 +81,21 @@ function UnstakeDTtoERC20(address dtpoolAddress, uint256 poolAmountIn, uint256 a
 @param to is the destination address receiving the given swapped tokens .
 @param refUnstakingAddress  is the address of the third party that will be paying the fees for unstaking.
 @param refUnstakingFees is the fees being extracted from the specific address for the Unstaking operation.
+@param deadline is the timestemp before which the txn with amountOutMin should be swapped as result.
 */
-function UnstakeDTtoETH(address dtpoolAddress, uint256 poolAmountIn, uint256 amountOutMin , address[] calldata  path , address to,  address refUnstakingAddress , uint256 refUnstakingFees ) payable  external;
+function UnstakeDTtoETH(address dtpoolAddress, uint256 poolAmountIn, uint256 amountOutMin , address[] calldata  path ,uint256 deadline address to, uint256 deadline,   address refUnstakingAddress , uint256 refUnstakingFees ) payable  external;
 
 /** allows unstaking of the DT from datapool (ocean/H20) to other dataTokens .
 @param dtpoolAddress is the address of datapool token that you want to  develop.
 @param   poolAmountIn is the amount of the BaseTokens that you want to unstake to  ETH. 
 @param  amountOutMin is the corresponding  amount of the minimum  baseTokens  tokens that user wants.
 @param path is the array  of addresses followed by swap and stake operation according to the available  liquidity .
+@param deadline deadline is the timestemp before which the txn with amountOutMin should be transactioned
 @param refUnstakingAddress is the address of the  third party that will be paying the fees for unstaking.
 @param refUnstakingFees is the fees being extracted from the specific address for the Unstaking operation.
-
+@param deadline is the timestemp before which the txn with amountOutMin should be swapped as result.
 */
-function UnstakeDTtoDT(address dtpoolAddress, uint256 poolAmountIn, uint256 amountOutMin, address[] calldata  path , address refUnstakingAddress , uint256 refUnstakingFees ) payable  external;
+function UnstakeDTtoDT(address dtpoolAddress, uint256 poolAmountIn, uint256 amountOutMin, address[] calldata  path , uint256 deadline,  address refUnstakingAddress , uint256 refUnstakingFees ) payable  external;
 
 
 
