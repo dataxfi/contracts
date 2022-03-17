@@ -155,4 +155,28 @@ interface ITradeRouter {
         address refAddress,
         uint256 deadline
     ) external;
+
+    /** @dev Swaps Exact amount of datatokens to max amount of  datatokens
+    @param amountDTIn is the exact amount of datatokens you want to be swapped 
+    @param amountOutMax is the max amount of datatokens you want to be swapped as result
+    @param path is the address array for the swap path based on liquidity
+    @param to is the destination address for the swapped tokens.
+    @param refFees is the referral fees paid to external dapps.
+    @param refAddress is the address where referral fees are paid to.
+    @param deadline is the max time in sec during which order must be filled.
+     */
+
+    function swapExactDatatokensforTokens(
+        uint amountDTIn,
+        uint amountOutMax,
+        address[] calldata path,
+        address to,
+        uint256 refFees,
+        address refAddress,
+        uint256 deadline
+    ) external;
+
+
+
+
 }
