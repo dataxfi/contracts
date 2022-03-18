@@ -1,39 +1,29 @@
 pragma solidity >=0.8.0 <0.9.0;
 //SPDX-License-Identifier: BSU-1.1
 
-import "../interfaces/IStorage.sol";
-import "../interfaces/IUniswapV2Router02.sol";
+import "../interfaces/IUniV2Router02.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract UniV2Adapter is IStorage {
-    IUniswapV2Router02 public uniswapRouter;
+contract UniV2Adapter {
+    IUniswapV2Router02 uniswapRouter;
     using SafeERC20 for ERC20;
-    uint256 currentVersion;
+    using SafeMath for uint256;
+    uint256 public currentVersion;
 
-    constructor(
-        address _routerAddress,
-        uint256 _currentVersion,
-        uint256 _StorageAddress
-    ) {
+    constructor(address _routerAddress, uint256 _currentVersion) {
         uniswapRouter = IUniswapV2Router02(_routerAddress);
-        IStorage reg = IStorage(_StorageAddress);
         currentVersion = _currentVersion;
     }
 
-    modifier availableAmt(uint256 amountOut) {
-        require(msg.value > amountOut, "balance-insufficient");
+    modifier hasAllowance(address tokenAddress, uint256 amount) {
+        IERC20 token = IERC20(tokenAddress);
+        uint256 _allowance = token.allowance(msg.sender, address(this));
+        require(_allowance >= amount, "Error: Not enough allowance");
         _;
-    }
-
-    function setVersionInStorage() public onlyOwner {
-        return
-            reg.upgradeContractAddresses(
-                keccak256("currentVersionAdapter", currentVersion),
-                address(this)
-            );
     }
 
     /** @dev swaps ETH to Exact Ocean
@@ -44,27 +34,23 @@ contract UniV2Adapter is IStorage {
     function swapETHtoExactTokens(
         uint256 amountOut,
         address[] calldata path,
+        address to,
         uint256 deadline
-    )
-        external
-        payable
-        availableAmt(amountOut)
-        returns (uint256 memory amountsOut)
-    {
-        // using the uniswap router contract.
-        amountsOut = uniswapRouter.swapETHForExactTokens{value: msg.value}(
+    ) external payable returns (uint256[] memory amounts) {
+        amounts = uniswapRouter.swapETHForExactTokens{value: msg.value}(
             amountOut,
             path,
-            msg.sender,
+            to,
             deadline
         );
-        require(
-            token.transfer(msg.sender, address(this).balance),
-            "Error: ETH Refund Failed"
+
+        (bool refunded, ) = payable(to).call{value: msg.value.sub(amounts[0])}(
+            ""
         );
+        require(refunded, "Error: ETH refund failed");
     }
 
-    /** @dev swaps Exact ETH to Tokens (OCEAN/H2O)
+    /** @dev swaps Exact ETH to Tokens
      * amountOutMin minimum output amount
      * path path of tokens
      * to destination address for output tokens
@@ -75,27 +61,16 @@ contract UniV2Adapter is IStorage {
         address[] calldata path,
         address to,
         uint256 deadline
-    )
-        external
-        payable
-        availableAmt(amountOutMin)
-        returns (uint256 memory amountsOut)
-    {
-        // calling external router for the swap
-        amountsOut = uniswapRouter.swapExactETHForTokens{value: msg.value}(
+    ) external payable returns (uint256[] memory amounts) {
+        amounts = uniswapRouter.swapExactETHForTokens{value: msg.value}(
             amountOutMin,
             path,
-            msg.sender,
+            to,
             deadline
-        );
-
-        require(
-            token.transfer(msg.sender, address(this).balance),
-            "Error: ETH Refund Failed"
         );
     }
 
-    /** @dev swaps Tokens (OCEAN/H2O) for Exact ETH
+    /** @dev swaps Tokens for Exact ETH
      * amountOut expected output amount
      * amountInMax maximum input amount
      * path path of tokens
@@ -111,20 +86,30 @@ contract UniV2Adapter is IStorage {
     )
         external
         payable
-        availableAmt(amountOut)
-        returns (uint256 memory amountsOut)
+        hasAllowance(path[0], amountInMax)
+        returns (uint256[] memory amounts)
     {
-        // only calling the given function given it implements the ETH transfer within the logic
-        amountsOut = uniswapRouter.swapTokensForExactETH(
+        //approve Uni router to spend
+        IERC20 token = IERC20(path[0]);
+        require(
+            token.transferFrom(msg.sender, address(this), amountInMax),
+            "Error: Failed to self transfer"
+        );
+        require(
+            token.approve(address(uniswapRouter), amountInMax),
+            "Error: Failed to approve UniV2Router"
+        );
+
+        amounts = uniswapRouter.swapTokensForExactETH(
             amountOut,
             amountInMax,
             path,
-            msg.sender,
+            to,
             deadline
         );
     }
 
-    /** @dev swaps Exact Tokens (OCEAN/H2O) for ETH
+    /** @dev swaps Exact Tokens for ETH
      * amountIn exact token input amount
      * amountOutMin minimum expected output amount
      * path path of tokens
@@ -139,11 +124,21 @@ contract UniV2Adapter is IStorage {
         uint256 deadline
     )
         external
-        payable
-        availableAmt(amountIn)
-        returns (uint256 memory amountsOut)
+        hasAllowance(path[0], amountIn)
+        returns (uint256[] memory amounts)
     {
-        amountsOut = uniswapRouter.swapExactTokensForETH(
+        //approve Uni router to spend
+        IERC20 token = IERC20(path[0]);
+        require(
+            token.transferFrom(msg.sender, address(this), amountIn),
+            "Error: Failed to self transfer"
+        );
+        require(
+            token.approve(address(uniswapRouter), amountIn),
+            "Error: Failed to approve UniV2Router"
+        );
+
+        amounts = uniswapRouter.swapExactTokensForETH(
             amountIn,
             amountOutMin,
             path,
@@ -152,7 +147,7 @@ contract UniV2Adapter is IStorage {
         );
     }
 
-    /** @dev swaps Exact Tokens (OCEAN/H2O) for Tokens(OCEAN/H2O)
+    /** @dev swaps Exact Tokens for Tokens
      * amountIn exact token input amount
      * amountOutMin minimum expected output amount
      * path path of tokens
@@ -165,22 +160,32 @@ contract UniV2Adapter is IStorage {
         address[] calldata path,
         address to,
         uint256 deadline
-    ) external returns (uint256 memory amountsOut) {
-        amountsOut = uniswapRouter.swapExactTokensForTokens(
+    )
+        external
+        hasAllowance(path[0], amountIn)
+        returns (uint256[] memory amounts)
+    {
+        //approve Uni router to spend
+        IERC20 token = IERC20(path[0]);
+        require(
+            token.transferFrom(msg.sender, address(this), amountIn),
+            "Error: Failed to self transfer"
+        );
+        require(
+            token.approve(address(uniswapRouter), amountIn),
+            "Error: Failed to approve UniV2Router"
+        );
+
+        amounts = uniswapRouter.swapExactTokensForTokens(
             amountIn,
             amountOutMin,
             path,
-            msg.sender,
+            to,
             deadline
-        );
-
-        require(
-            token.transfer(msg.sender, address(this).balance),
-            "Error: token refund failed/check-txn"
         );
     }
 
-    /** @dev swaps Tokens (OCEAN/H2O) for Exact (OCEAN/H2O)
+    /** @dev swaps Tokens for Exact Tokens
      * amountOut expected output amount
      * amountInMax maximum input amount
      * path path of tokens
@@ -193,17 +198,28 @@ contract UniV2Adapter is IStorage {
         address[] calldata path,
         address to,
         uint256 deadline
-    ) external returns (uint256 memory amountsOut) {
-        amountsOut = uniswapRouter.swapTokensForExactTokens(
+    )
+        external
+        hasAllowance(path[0], amountInMax)
+        returns (uint256[] memory amounts)
+    {
+        //approve Uni router to spend
+        IERC20 token = IERC20(path[0]);
+        require(
+            token.transferFrom(msg.sender, address(this), amountInMax),
+            "Error: Failed to self transfer"
+        );
+        require(
+            token.approve(address(uniswapRouter), amountInMax),
+            "Error: Failed to approve UniV2Router"
+        );
+
+        amounts = uniswapRouter.swapTokensForExactTokens(
             amountOut,
             amountInMax,
             path,
-            msg.sender,
+            to,
             deadline
-        );
-        require(
-            token.transfer(msg.sender, address(this).balance),
-            "Error: token refund failed/check-txn"
         );
     }
 
