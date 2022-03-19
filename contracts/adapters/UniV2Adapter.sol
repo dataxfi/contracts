@@ -1,4 +1,5 @@
 pragma solidity >=0.8.0 <0.9.0;
+// Copyright DataX Protocol contributors
 //SPDX-License-Identifier: BSU-1.1
 
 import "../interfaces/IUniV2Router02.sol";
@@ -7,8 +8,9 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract UniV2Adapter {
+contract UniV2Adapter is ReentrancyGuard {
     IUniswapV2Router02 uniswapRouter;
     using SafeERC20 for ERC20;
     using SafeMath for uint256;
@@ -19,6 +21,7 @@ contract UniV2Adapter {
         currentVersion = _currentVersion;
     }
 
+    //check if this contract has needed spending allowance
     modifier hasAllowance(address tokenAddress, uint256 amount) {
         IERC20 token = IERC20(tokenAddress);
         uint256 _allowance = token.allowance(msg.sender, address(this));
@@ -37,6 +40,7 @@ contract UniV2Adapter {
         address to,
         uint256 deadline
     ) external payable returns (uint256[] memory amounts) {
+        //swap ETH to exact tokens
         amounts = uniswapRouter.swapETHForExactTokens{value: msg.value}(
             amountOut,
             path,
@@ -44,6 +48,7 @@ contract UniV2Adapter {
             deadline
         );
 
+        //refund remaining ETH
         (bool refunded, ) = payable(to).call{value: msg.value.sub(amounts[0])}(
             ""
         );
@@ -100,12 +105,19 @@ contract UniV2Adapter {
             "Error: Failed to approve UniV2Router"
         );
 
+        //swap tokens to exact ETH
         amounts = uniswapRouter.swapTokensForExactETH(
             amountOut,
             amountInMax,
             path,
             to,
             deadline
+        );
+
+        //refund remaining tokens
+        require(
+            token.transfer(msg.sender, amountInMax.sub(amounts[0])),
+            "Error: Token refund failed"
         );
     }
 
@@ -138,6 +150,7 @@ contract UniV2Adapter {
             "Error: Failed to approve UniV2Router"
         );
 
+        //swap exact tokens to ETH
         amounts = uniswapRouter.swapExactTokensForETH(
             amountIn,
             amountOutMin,
@@ -176,6 +189,7 @@ contract UniV2Adapter {
             "Error: Failed to approve UniV2Router"
         );
 
+        //swap exact tokens to tokens
         amounts = uniswapRouter.swapExactTokensForTokens(
             amountIn,
             amountOutMin,
@@ -214,12 +228,19 @@ contract UniV2Adapter {
             "Error: Failed to approve UniV2Router"
         );
 
+        // swap tokens to exact tokens
         amounts = uniswapRouter.swapTokensForExactTokens(
             amountOut,
             amountInMax,
             path,
             to,
             deadline
+        );
+
+        //refund remaining tokens
+        require(
+            token.transfer(msg.sender, amountInMax.sub(amounts[0])),
+            "Error: Token refund failed"
         );
     }
 
