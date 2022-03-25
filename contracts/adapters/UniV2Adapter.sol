@@ -30,9 +30,11 @@ contract UniV2Adapter is ReentrancyGuard {
     }
 
     /** @dev swaps ETH to Exact Ocean
-     * oceanAmount
-     * path
-     * deadline
+     * @param amountOut expected output amount
+     * @param path path of tokens
+     * @param to destination address for output tokens
+     * @param deadline transaction deadline
+     * @return amounts calculated for given path
      */
     function swapETHtoExactTokens(
         uint256 amountOut,
@@ -56,10 +58,11 @@ contract UniV2Adapter is ReentrancyGuard {
     }
 
     /** @dev swaps Exact ETH to Tokens
-     * amountOutMin minimum output amount
-     * path path of tokens
-     * to destination address for output tokens
-     * deadline transaction deadline
+     * @param amountOutMin minimum output amount
+     * @param path path of tokens
+     * @param to destination address for output tokens
+     * @param deadline transaction deadline
+     * @return amounts calculated for given path
      */
     function swapExactETHForTokens(
         uint256 amountOutMin,
@@ -76,11 +79,12 @@ contract UniV2Adapter is ReentrancyGuard {
     }
 
     /** @dev swaps Tokens for Exact ETH
-     * amountOut expected output amount
-     * amountInMax maximum input amount
-     * path path of tokens
-     * to destination address for output tokens
-     * deadline transaction deadline
+     * @param amountOut expected output amount
+     * @param amountInMax maximum input amount
+     * @param path path of tokens
+     * @param to destination address for output tokens
+     * @param deadline transaction deadline
+     * @return amounts calculated for given path
      */
     function swapTokensForExactETH(
         uint256 amountOut,
@@ -122,11 +126,12 @@ contract UniV2Adapter is ReentrancyGuard {
     }
 
     /** @dev swaps Exact Tokens for ETH
-     * amountIn exact token input amount
-     * amountOutMin minimum expected output amount
-     * path path of tokens
-     * to destination address for output tokens
-     * deadline transaction deadline
+     * @param amountIn exact token input amount
+     * @param amountOutMin minimum expected output amount
+     * @param path path of tokens
+     * @param to destination address for output tokens
+     * @param deadline transaction deadline
+     * @return amounts calculated for given path
      */
     function swapExactTokensForETH(
         uint256 amountIn,
@@ -161,11 +166,12 @@ contract UniV2Adapter is ReentrancyGuard {
     }
 
     /** @dev swaps Exact Tokens for Tokens
-     * amountIn exact token input amount
-     * amountOutMin minimum expected output amount
-     * path path of tokens
-     * to destination address for output tokens
-     * deadline transaction deadline
+     * @param amountIn exact token input amount
+     * @param amountOutMin minimum expected output amount
+     * @param path path of tokens
+     * @param to destination address for output tokens
+     * @param deadline transaction deadline
+     * @return amounts calculated for given path
      */
     function swapExactTokensForTokens(
         uint256 amountIn,
@@ -200,11 +206,12 @@ contract UniV2Adapter is ReentrancyGuard {
     }
 
     /** @dev swaps Tokens for Exact Tokens
-     * amountOut expected output amount
-     * amountInMax maximum input amount
-     * path path of tokens
-     * to destination address for output tokens
-     * deadline transaction deadline
+     * @param amountOut expected output amount
+     * @param amountInMax maximum input amount
+     * @param path path of tokens
+     * @param to destination address for output tokens
+     * @param deadline transaction deadline
+     * @return amounts calculated for given path
      */
     function swapTokensForExactTokens(
         uint256 amountOut,
@@ -242,6 +249,32 @@ contract UniV2Adapter is ReentrancyGuard {
             token.transfer(msg.sender, amountInMax.sub(amounts[0])),
             "Error: Token refund failed"
         );
+    }
+
+    /** @dev calculates and returns output amounts for given input amount
+     * @param amountIn exact input token amount
+     * @param path of given tokens
+     * @return amountsOut calculated for given path
+     */
+    function getAmountsOut(uint256 amountIn, address[] memory path)
+        public
+        view
+        returns (uint256[] memory amountsOut)
+    {
+        amountsOut = uniswapRouter.getAmountsOut(amountIn, path);
+    }
+
+    /** @dev calculates and returns input amounts needed for expected output amount
+     * @param amountOut exact expected output token amount
+     * @param path of given tokens
+     * @return amountsIn calculated for given path
+     */
+    function getAmountsIn(uint256 amountOut, address[] memory path)
+        public
+        view
+        returns (uint256[] memory amountsIn)
+    {
+        amountsIn = uniswapRouter.getAmountsIn(amountOut, path);
     }
 
     receive() external payable {}
