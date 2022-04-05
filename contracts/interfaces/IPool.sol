@@ -54,4 +54,6 @@ interface IPool {
         uint256 tokenAmountIn,
         uint256 minPoolAmountOut
     ) external returns (uint256 poolAmountOut);
+
+    function transfer(address to, uint256 amount) external;
 }

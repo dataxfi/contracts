@@ -106,13 +106,16 @@ contract StakeRouter is ReentrancyGuard {
     ) external payable returns (uint256 amountIn) {
         require(meta[2] != address(0), "Destination address not provided");
 
-        IERC20 token = IERC20(pool);
+        IERC20 token = IERC20(meta[0]);
 
         //approve Pool to spend base token
         require(
             token.allowance(address(this)) > uints[0],
             "Error: Not enough allowance"
         );
+
+        //handle unstake
+        IPool pool = IPool(meta[0]);
 
         //unstake base token from pool
         uint256 tokenAmountOut = pool.exitswapPoolAmountIn(uints[0], uints[1]);
@@ -129,9 +132,9 @@ contract StakeRouter is ReentrancyGuard {
         );
 
         //transfer ETH to user
-        (bool sent, ) = payable(to).call{value: _amounts[_amounts.length - 1]}(
-            ""
-        );
+        (bool sent, ) = payable(meta[2]).call{
+            value: _amounts[_amounts.length - 1]
+        }("");
         require(sent, "Error: ETH transfer failed");
     }
 
@@ -142,7 +145,7 @@ contract StakeRouter is ReentrancyGuard {
     ) external payable returns (uint256 amountIn) {
         require(meta[2] != address(0), "Destination address not provided");
 
-        IERC20 token = IERC20(pool);
+        IERC20 token = IERC20(meta[0]);
 
         //approve Pool to spend base token
         require(
@@ -150,6 +153,8 @@ contract StakeRouter is ReentrancyGuard {
             "Error: Not enough allowance"
         );
 
+        //handle unstake
+        IPool pool = IPool(meta[0]);
         //unstake base token from pool
         uint256 tokenAmountOut = pool.exitswapPoolAmountIn(uints[0], uints[1]);
 
