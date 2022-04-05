@@ -1,320 +1,253 @@
 pragma solidity >=0.8.0 <0.9.0;
+//Copyright of DataX Protocol contributors
 //SPDX-License-Identifier: BSU-1.1
 
-import "../Base.sol";
 import "../interfaces/IUniV2Adapter.sol";
 import "../interfaces/ITradeRouter.sol";
-import "../interfaces/IPool.sol";
-import "@openzeppelin/contracts/tokens/ERC20/IERC20.sol";
-import "../interfaces/IStorage.sol";
 import "../interfaces/ICommunityFeeCollector.sol";
+import "../interfaces/IPool.sol";
+import "../interfaces/IFixedRateExchange.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../interfaces/IStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/tokens/ERC20/IERC20.sol";
-contract TradeRouter is Base, ITradeRouter {
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract TradeRouter is ReentrancyGuard {
     using SafeMath for uint256;
-    IUniV2Adapter adapter;
     ICommunityFeeCollector collector;
-    uint256 public communityFee;
-    uint public currentVersionTR;
-    // adding publishing marketting address (which will be getting the fees for every swap with the datatoken).
-    address public publishMarketAddress;
-    constructor(address adapterAddress , address dtpoolAddress , uint _version , uint _fees,address  _StorageAddress, address _collectorAddress, address _publishingMarketingAddress ) {
-        adapter = IUniV2Adapter(adapterAddress);
-        IPool dtpool = IPool(dtPoolAddress);
-        IStorage reg = IStorage(_StorageAddress);
-        collector = ICommunityFeeCollector(_collectorAddress);
+    uint256 public currentVersion;
+    uint256 ZERO_FEES = 0;
+    uint256 MAX_INT = 2**256 - 1;
+
+    constructor(uint256 _version) {
         currentVersion = _version;
-        setParam(_fees);
-        }
-    modifier onlyGov {
-        require(msg.sender == Owner());
-    }
-    
-    
-// getter function returning the community fees 
-    function getSwapFees() public returns (uint256) {
-        return(reg.getStateParams(keccak256("swapFees"),currentVersionTR));
     }
 
-    function getCurrentVersion() public returns (uint) {
-        return(currentVersionTR);
-    }
-
-    // @dev : address receiving the fees from the swapping operation
-    function setCollector(address payable _feeCollector) public {
-        require(collector.changeCollector(_feeCollector), "permission denied");
-    }
-  
-    //@dev wrapper contract for storing the current state values 
-    function setParamUint(uint256 newParameter) public onlyGov {
-        return reg.upgradeStateParameters(keccak256(variable_name, currentVersionTR), newParameter);
-    }
     function swapETHToExactDatatoken(
-        uint256 amountOut,
-        uint256 amountInMax,
+        uint256[4] calldata uints, //[quoteAmountOut, dtAmountOut, refFees, deadline]
         address[] calldata path,
-        address to,
-        uint256 refFees,
-        address refAddress,
-        uint256 deadline
-    ) external __lock__ payable {
-        // convert ETH to Ocean/H20 or other baseToken in the given dtpool. 
-        address[2] pathOne = [path[0], path[1]];
-        uint256 amountsOcean = adapter.swapETHtoExactTokens(
-            amountsOut[0],
-            pathOne,
-            deadline
-        );
-        // convert Ocean to Datatokens 
-        // indexing will be from 0
-        address dataToken = path[path.length - 1];
+        address[5] calldata meta, //[source, dtAddress, to, refAddress, adapterAddress]
+        bool isFRE,
+        bytes32 exchangeId
+    ) external payable returns (uint256 amountIn) {
+        require(meta[2] != address(0), "Destination address not provided");
 
-        // to be send to the feeCollector and the rest is to be converted 
-         uint256 feesCollector = mul(amountsOcean, getSwapFees());
-        uint256 OceanAmountSwapped =  sub(amountsOcean, feesCollector);
-        /** tokenInOutAddress = [tokenIn, tokenOut, consumeMarketFeeAddress]
-        amountsInOutMaxFee = [maxAmountIn,tokenAmountOut,maxPrice, consumeMarketSwapFee].
-        */
-    uint256 maxPrice = dtpool.getSpotPrice(path[0],path[path.length - 1], dtpool.getSwapFee());
-       address[3] tokenInOutAddress = [path[1],path[path.length - 1],dtpool.getSwapFee()];
-       address[4] amountsInOutMaxFee = [amountInMax, amountOut, maxPrice, dtpool.getSwapFee() ];
-        // and then finally staking to the data token
-       dtpool.swapExactAmountOut(
-            tokenInOutAddress,
-            amountsInOutmaxFee
-        );
+        //TODO: deduct trade fee + ref fee
 
-        collector.withdrawToken(dataToken);    
+        //swap ETH to dtpool quote token
+        IUniV2Adapter adapter = IUniV2Adapter(meta[4]);
 
-    }
+        uint256[] memory _amounts = adapter.swapETHtoExactTokens{
+            value: msg.value
+        }(uints[0], path, address(this), uints[3]);
 
+        IERC20 token = IERC20(path[path.length - 1]);
 
-    function swapExactETHforDataTokens(
-        uint256 amounIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 refFees,
-        address refAddress,
-        uint256 deadline
-    ) public __lock__ payable  override {
-        // conversion from  the ETH to the given baseToken
-        uint256 amountsOcean = adapter.swapExactETHtoTokens(
-        amountOutMin,
-        path,
-         to,
-        deadline
-        );
-      address dataToken = path[path.length - 1];
-        // to be send to the feeCollector and the rest is to be converted 
-         uint256 feesCollector = mul(amountsOcean, getSwapFees());
-        uint256 OceanAmountSwapped =  sub(amountsOcean, feesCollector);
+        //swap quote token to dt
+        if (isFRE) {
+            //handle FRE swap
+            IFixedRateExchange exchange = IFixedRateExchange(meta[0]);
 
-       uint256 maxPrice = dtpool.getSwapFee(path[0],path[path.length - 1], dtpool.getSwapFee() );
-       address[3] tokenInOutAddress = [path[0],path[path.length - 1],dtpool.getSwapFee()];
-       address[4] amountsInOutMaxFee = [amountInMax, amountOut, maxPrice, dtpool.getSwapFee() ];
-        // and then finally staking to the data token
-       dtpool.swapExactAmountOut(
-            tokenInOutAddress,
-            amountsInOutmaxFee
-        );
-        collector.withdrawToken(dataToken);    
+            //approve Exchange to spend base token
+            require(
+                token.approve(address(exchange), _amounts[_amounts.length - 1]),
+                "Error: Failed to approve FRE"
+            );
 
+            exchange.buyDT(
+                exchangeId,
+                uints[1],
+                _amounts[_amounts.length - 1],
+                address(0),
+                0
+            );
 
-    }
+            //transfer dt to destination address
+            require(
+                IERC20(meta[1]).transfer(meta[2], uints[1]),
+                "Error: DT transfer failed"
+            );
+        } else {
+            //handle Pool swap
+            IPool pool = IPool(meta[0]);
 
+            //approve Pool to spend base token
+            require(
+                token.approve(address(pool), _amounts[_amounts.length - 1]),
+                "Error: Failed to approve Pool"
+            );
 
-    //TODO : function swap ERC20 to exact DT
-    function swapTokenToExactDatatoken(
-        address dtpoolAddress,
-        uint256[] calldata amountsOut,
-        address[] calldata path,
-        address datatoken,
-        uint256 deadline
-    ) external  __lock__ payable{
-        
-       uint256 amounts = adapter.swapExactTokensForTokens(AmountIn, amountOutMin, path, to, deadline);
-       address dataToken = path[path.length - 1];
-        dtpool.swapExactAmountIn(
-            dataToken,
-            amounts,
-            datatoken,
-            amountsOut[1],
-            0 //maxPrice
-        );
+            address[3] memory tokenInOutMarket = [
+                path[path.length - 1],
+                meta[1],
+                address(0)
+            ];
+            uint256[4] memory amountsInOutMaxFee = [
+                _amounts[_amounts.length - 1],
+                uints[1],
+                MAX_INT,
+                ZERO_FEES
+            ];
+            (amountIn, ) = pool.swapExactAmountOut(
+                tokenInOutMarket,
+                amountsInOutMaxFee
+            );
 
-
-        
-
-    }
-
-    function swapExactTokensforDataTokens(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 refFees,
-        address refAddress,
-        uint256 deadline
-    ) external  __lock__ payable {
-        // path is between the baseToken and datatoken.
-
-        address[2] pathOne = [path[0], path[1]];
-        uint256 amountsOcean = adapter.swapExactTokenstoTokens(
-         amountIn,
-         amountOutMin,
-         pathOne,
-         to,
-         deadline
-        );
-       address dataToken = path[path.length - 1];
-        // to be send to the feeCollector and the rest is to be converted 
-         uint256 feesCollector = mul(amountsOcean, CollectorFees());
-        uint256 OceanAmountSwapped =  sub(amountsOcean, feesCollector);
-
-    }
-
-    
-
-    //TODO : function swap DT to exact ERC20
-    function swapDatatokenToExactToken(
-        address datatoken,
-        address maxAmountIn,
-        address[] calldata path,
-        uint256 deadline
-
-    ) external {
-        // flow : DT unstaked --> dataToken --> ExactTokens 
-        address erc20tokenOut = path[path.length - 1];
-        swap.swapExactAmountOut(datatoken, maxAmountIn,erc20tokenOut, deadline);
-    }
-
-
-
-
-
-function  swapExactDatatokensforDatatokens(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 refFees,
-        address refAddress,
-        uint256 deadline
-    ) __lock__ public {
-
-        address[] newPath;
-        // swapping out exactDT to the tokens 
-        swapExactDatatokensforTokens(
-            amountIn,
-            dtpool.getAmountOutExactIn(path[0],path[1], amountIn, getSwapFees()),
-            [path[0], path[1]],
-            address(this),
-            
-
-        );
-
-
-
-    }
-//@dev here swapp fees accured will be two times , so no need of fees accural sepearately.
- function swapDatatokensforExactDatatokens(
-        uint256 amountOut,
-        uint256 amountInMax,
-        address[] calldata path,
-        address to,
-        uint256 deadline,
-        uint256 refFees,
-        address refAddress
-    ) 
-    {
-        address[] newPath;
-
-        swapDatatokensforExactTokens(
-            amountInMax,
-            getAmountOutMaxIn(path[0], path[1], amountInMax, getSwapFees()),
-            [path[0] ,path[1]],
-            address(this),
-            deadline,
-            refFees,
-            refAddress
-        );
-        // now we will be recursively calling the function to swap the dataToken to the given  destination address
-        /**
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 refFees,
-        address refAddress,
-        uint256 deadline
-         */
-       uint256 baseTokenAmountIn = (IERC20(datatokenAmountIn).BalanceOf(path[1]);
-
-
-        for(int i = 1; i < path[path.length - 1]; i++)
-        {
-            newPath.push(path[i]);
+            //transfer dt to destination address
+            require(
+                IERC20(meta[1]).transfer(meta[2], uints[1]),
+                "Error: DT transfer failed"
+            );
         }
-       swapExactTokensforDataTokens(baseTokenAmountIn,
-       amountInMax,
-       newPath,
-       to,
-       refFees,
-       refAddress,
-       deadline
-       );
-
-
     }
 
-    
-function swapExactDatatokensforTokens(
-        uint amountDTIn,
-        uint amountOutMax,
+    function swapExactETHToDatatoken(
+        uint256[4] calldata uints, //[quoteAmountOut, dtAmountOut, refFees, deadline]
         address[] calldata path,
-        address to,
-        uint256 refFees,
-        address refAddress,
-        uint256 deadline
-    )  _lock_ public 
+        address[5] calldata meta, //[source, dtAddress, to, refAddress, adapterAddress]
+        bool isFRE,
+        bytes32 exchangeId
+    ) external payable returns (uint256 amountIn) {
+        require(meta[2] != address(0), "Destination address not provided");
 
-    {
-    // assuming the direct swap with the underlying base token (OCEAN/H20)
-    uint256[3] tokenInOutMarket = [path[0], path[1], publishMarketAddress];
-    uint256 minAmountOutBT = getAmountOutExactIn(path[0],path[1], amountDTIn, dtpool.getSwapFees());
-    uint256 maxPrice = getSpotPrice(path[0], path[1],dtpool.getSwapFees());
-    uint256[4] amountsInOutMaxFee = [amountDTIn, minAmountOutBT, maxPrice, dtpool.getSwapFees() ];
-    // then swapping the datatokens with the balancer pool.
-    uint256 swappedAmountBTOut = dtpool.swapExactAmountIn(
-        tokenInOutMarket,
-        amountsInOutMaxFee)[0];
-    
-    
-    // converting the resulting amount after deduction of the collector fees 
-    
-    uint256 swappedFinalBT = swappedAmountBTOut - getSwapFees();
-    
-    // now we will be converting underlying baseToken to the destination token.
+        //TODO: deduct trade fee + ref fee
 
-    address dtAddress = path[1];
+        //swap ETH to dtpool quote token
+        IUniV2Adapter adapter = IUniV2Adapter(meta[4]);
 
-    // first  new path will be the addresses of the intermediate LP tokens that will be swapped.
-    uint256[] newPath ;
-    for(int i = 1; i < path.length-1; i++)
-    {
-        newPath.push(path[i]);
+        uint256[] memory _amounts = adapter.swapExactETHForTokens{
+            value: msg.value
+        }(uints[0], path, address(this), uints[3]);
+
+        IERC20 token = IERC20(path[path.length - 1]);
+
+        //swap quote token to dt
+        if (isFRE) {
+            //handle FRE swap
+            IFixedRateExchange exchange = IFixedRateExchange(meta[0]);
+
+            //approve Exchange to spend base token
+            require(
+                token.approve(address(exchange), _amounts[_amounts.length - 1]),
+                "Error: Failed to approve FRE"
+            );
+
+            exchange.buyDT(
+                exchangeId,
+                uints[1],
+                _amounts[_amounts.length - 1],
+                address(0),
+                0
+            );
+
+            //transfer dt to destination address
+            require(
+                IERC20(meta[1]).transfer(meta[2], uints[1]),
+                "Error: DT transfer failed"
+            );
+        } else {
+            //handle Pool swap
+            IPool pool = IPool(meta[0]);
+
+            //approve Pool to spend base token
+            require(
+                token.approve(address(pool), _amounts[_amounts.length - 1]),
+                "Error: Failed to approve Pool"
+            );
+
+            address[3] memory tokenInOutMarket = [
+                path[path.length - 1],
+                meta[1],
+                address(0)
+            ];
+            uint256[4] memory amountsInOutMaxFee = [
+                _amounts[_amounts.length - 1],
+                uints[1],
+                MAX_INT,
+                ZERO_FEES
+            ];
+            (amountIn, ) = pool.swapExactAmountOut(
+                tokenInOutMarket,
+                amountsInOutMaxFee
+            );
+
+            //transfer dt to destination address
+            require(
+                IERC20(meta[1]).transfer(meta[2], uints[1]),
+                "Error: DT transfer failed"
+            );
+        }
     }
-    
-    adapter.swapExactTokenforTokens(
-        swappedFinalBT,
-        amountOutMax,
-        newPath,
-        to,
-        deadline
-    );
-    collector.withdrawToken(dataToken); 
+
+    function swapExactDatatokenToETH(
+        uint256[4] calldata uints, //[quoteAmountOut, dtAmountIn, refFees, deadline]
+        address[] calldata path,
+        address[5] calldata meta, //[source, dtAddress, to, refAddress, adapterAddress]
+        bool isFRE,
+        bytes32 exchangeId
+    ) external payable returns (uint256 amountIn) {
+        require(meta[2] != address(0), "Destination address not provided");
+
+        IERC20 token = IERC20(path[path.length - 1]);
+
+        //swap dt to base token
+        if (isFRE) {
+            //handle FRE swap
+            IFixedRateExchange exchange = IFixedRateExchange(meta[0]);
+
+            //approve Exchange to spend base token
+            require(
+                token.approve(address(exchange), uints[1]),
+                "Error: Failed to approve FRE"
+            );
+
+            exchange.sellDT(exchangeId, uints[1], uints[0], address(0), 0);
+
+            //transfer dt to destination address
+            require(
+                IERC20(meta[1]).transfer(meta[2], uints[1]),
+                "Error: DT transfer failed"
+            );
+        } else {
+            //handle Pool swap
+            IPool pool = IPool(meta[0]);
+
+            //approve Pool to spend base token
+            require(
+                token.approve(address(pool), uints[1]),
+                "Error: Failed to approve Pool"
+            );
+
+            address[3] memory tokenInOutMarket = [meta[1], path[0], address(0)];
+            uint256[4] memory amountsInOutMaxFee = [
+                uints[0],
+                uints[1],
+                MAX_INT,
+                ZERO_FEES
+            ];
+            (amountIn, ) = pool.swapExactAmountOut(
+                tokenInOutMarket,
+                amountsInOutMaxFee
+            );
+
+            //swap Dt to base token
+            IUniV2Adapter adapter = IUniV2Adapter(meta[4]);
+
+            uint256 amountOut = adapter.swapExactTokensForETH(
+                uints[0],
+                uints[0],
+                path,
+                address(this),
+                uints[3]
+            );
+
+            //refund remaining ETH
+            (bool refunded, ) = payable(meta[1]).call{value: amountOut}("");
+            require(refunded, "Error: ETH refund failed");
+        }
     }
 
+    //receive ETH
+    receive() external payable {}
 }

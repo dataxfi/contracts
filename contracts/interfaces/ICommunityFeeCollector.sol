@@ -1,27 +1,19 @@
-// SPDX-Iicense-Identifier: MIT
+pragma solidity >=0.8.0 <0.9.0;
 
-pragma solidity ^0.8.10;
+//Copyright of DataX Protocol contributors
+//SPDX-License-Identifier: BSU-1.1
 
 interface ICommunityFeeCollector {
+    function withdrawETH() external payable;
 
+    function withdrawToken(address tokenAddress) external;
 
-function withdrawETH() external payable ;
+    function changeCollector(address payable newCollector) external;
 
-function withdrawToken(address tokenAddress) external;
-
-
-function changeCollector(address payable newCollector) external ;
-
-
-fallback() external payable ;
+    fallback() external payable;
 
     /**
      * @dev receive ETH
      */
-receive() external payable ;
-
-
-
-
-
+    receive() external payable;
 }

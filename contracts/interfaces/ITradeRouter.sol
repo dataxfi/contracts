@@ -11,19 +11,7 @@ interface ITradeRouter {
 
     /** @dev  get the constant fees being transferred to the collector after the swap.
      */
-    function getSwapFees() external view returns (uint256);
-
-    /** @dev sets the new address for withdrawing the remaining tokens after swap and transfer to the user.
-    @param _feeCollector new address of wallet for getting fees in native token.
-    */
-    function setCollector(address payable _feeCollector) external;
-
-    /** @dev set the parameter for arbitrary uint parameters (version , community fees ...) for the functions in the contract.
-    @param variable_name  will be the  name of the  contract parameters that you want to store.  the accepted values for now : "swapFees", "Version"
-    @param value  the value corresponding to the parameter that you want to set.
-    */
-    function setParameterUint(string memory variable_name, uint256 value)
-        external;
+    function getTradeFees() external view returns (uint256);
 
     /** @dev Swaps given max amount of ETH (native token) to datatokens
     @param amountOut is the exact amount of datatokens you want to be receive
@@ -42,7 +30,7 @@ interface ITradeRouter {
         uint256 refFees,
         address refAddress,
         uint256 deadline
-    ) external;
+    ) external returns (uint256[] memory amounts);
 
     /** @dev Swaps exact amount of ETH (native token) to datatokens
     @param amountOutMin is the min amount of datatokens you want to receive
@@ -59,7 +47,7 @@ interface ITradeRouter {
         uint256 refFees,
         address refAddress,
         uint256 deadline
-    ) external;
+    ) external returns (uint256[] memory amounts);
 
     /** @dev Swaps exact amount of datatokens to ETH (native token)
     @param amountIn is the exact amount of datatokens you want to spend 
@@ -78,7 +66,7 @@ interface ITradeRouter {
         uint256 refFees,
         address refAddress,
         uint256 deadline
-    ) external;
+    ) external returns (uint256[] memory amounts);
 
     /** @dev Swaps given max amount of erc20 tokens to datatokens
     @param amountOut is the exact amount of Datatokens you want to be receive
@@ -97,7 +85,7 @@ interface ITradeRouter {
         uint256 refFees,
         address refAddress,
         uint256 deadline
-    ) external;
+    ) external returns (uint256[] memory amounts);
 
     /** @dev Swaps exact amount of erc20 tokens to datatokens
     @param amountIn is the exact amount of erc20 tokens you want to spend 
@@ -116,7 +104,7 @@ interface ITradeRouter {
         uint256 refFees,
         address refAddress,
         uint256 deadline
-    ) external;
+    ) external returns (uint256[] memory amounts);
 
     /** @dev Swaps exact amount of datatokens to erc20 tokens
     @param amountIn is the exact amount of datatokens you want to spend 
@@ -135,7 +123,7 @@ interface ITradeRouter {
         uint256 refFees,
         address refAddress,
         uint256 deadline
-    ) external;
+    ) external returns (uint256[] memory amounts);
 
     /** @dev Swaps given max amount of datatokens to exact datatokens
     @param amountOut is the exact amount of datatokens you want to be receive
@@ -154,7 +142,7 @@ interface ITradeRouter {
         uint256 refFees,
         address refAddress,
         uint256 deadline
-    ) external;
+    ) external returns (uint256[] memory amounts);
 
     /** @dev Swaps Exact amount of datatokens to max amount of  datatokens
     @param amountDTIn is the exact amount of datatokens you want to be swapped 
@@ -167,16 +155,12 @@ interface ITradeRouter {
      */
 
     function swapExactDatatokensforTokens(
-        uint amountDTIn,
-        uint amountOutMax,
+        uint256 amountDTIn,
+        uint256 amountOutMax,
         address[] calldata path,
         address to,
         uint256 refFees,
         address refAddress,
         uint256 deadline
-    ) external;
-
-
-
-
+    ) external returns (uint256[] memory amounts);
 }
