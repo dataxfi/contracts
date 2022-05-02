@@ -1,51 +1,116 @@
-pragma solidity 0.8.10; 
-// SPDX-License-Identifier: MIT
+pragma solidity >=0.8.0 <0.9.0;
 
-contract Storage  {
-    // mapping for version of prootcol and address
-     uint public versionRegistry;
-    // with bytes32 key generated via the keccack hashing 
-    mapping(bytes32 => address) addressStorage;
-    // consisting of storing fees or other parameter needed by the protocol
-    mapping(bytes32 => uint256) parameterStorage;
-    
-    address currentOwner;
-   
-    constructor(uint _currentVersion) {
-     currentOwner = msg.sender;
-   //  upgradeNewVersion(_currentVersion);
+// SPDX-License-Identifier: BSU-1.1
+
+contract Storage {
+    address public admin;
+    address public pendingAdmin;
+
+    constructor() {
+        admin = msg.sender;
     }
 
-    modifier onlyGov() {
-        require(msg.sender == currentOwner);
+    modifier adminOnly() {
+        require(msg.sender == admin, "admin only");
         _;
     }
 
-    // getter method 
-    
-    function getAddressContract(bytes32 _key) public  returns(address) {
-        return addressStorage[_key];
+    /*********************/
+    /****    Admin   *****/
+    /*********************/
+
+    /**
+     * Request a new admin to be set for the contract.
+     *
+     * @param newAdmin New admin address
+     */
+    function setPendingAdmin(address newAdmin) public adminOnly {
+        pendingAdmin = newAdmin;
     }
 
+    /**
+     * Accept admin transfer from the current admin to the new.
+     */
+    function acceptPendingAdmin() public {
+        require(
+            msg.sender == pendingAdmin && pendingAdmin != address(0),
+            "Caller must be the pending admin"
+        );
 
-    function getCurrentVersion() public returns(uint) {
-        return  versionRegistry;
+        admin = pendingAdmin;
+        pendingAdmin = address(0);
     }
 
+    /*********************/
+    /***    Storage   ****/
+    /*********************/
 
-    function getStateParams(bytes32 _key) public returns(uint256) {
-        return parameterStorage[_key];
-    }  
-    // setter method 
-    function upgradeNewVersion(uint  newVersion) public  onlyGov returns(address)  {
-       versionRegistry = newVersion;
+    mapping(bytes32 => address) public addressStorage;
+    mapping(bytes32 => uint8) public currentVersion;
+    mapping(bytes32 => uint256) public fees;
+
+    /******** Contract Address Storage *******/
+    function getContractAdd(string calldata name, uint8 version)
+        external
+        view
+        returns (address)
+    {
+        bytes32 _name = stringToBytes32(name);
+        bytes32 key = keccak256(abi.encode(_name, version));
+        return addressStorage[key];
     }
-    // @dev : for corresponding  contracts , use key = keccak256("tradeRouter",tradeRouterAddress).
-    // @notice : allows to set the current version of the contract
-    function upgradeContractAddresses(bytes32 key , address newRouter) public onlyGov  {
-         addressStorage[key] = newRouter; 
+
+    function getCurrentVersion(string calldata name)
+        external
+        view
+        returns (uint8)
+    {
+        bytes32 _name = stringToBytes32(name);
+        return currentVersion[_name];
     }
-    function upgradeStateParameters(bytes32 key , uint256 newValue)  public onlyGov  {
-        parameterStorage[key] = newValue;
+
+    function updateContractVersion(
+        string calldata name,
+        uint8 version,
+        address value
+    ) external adminOnly {
+        bytes32 _name = stringToBytes32(name);
+        require(
+            version == currentVersion[_name] + 1,
+            "Version not incremental"
+        );
+        bytes32 key = keccak256(abi.encode(_name, version));
+        addressStorage[key] = value;
+        currentVersion[_name] = version;
+    }
+
+    /******** DataX Fees Storage *******/
+    function getFees(string calldata key) external view returns (uint256) {
+        bytes32 _key = stringToBytes32(key);
+        return fees[_key];
+    }
+
+    function updateFees(string calldata key, uint256 value) external adminOnly {
+        bytes32 _key = stringToBytes32(key);
+        fees[_key] = value;
+    }
+
+    /*********************/
+    /*****    Utils   ****/
+    /*********************/
+
+    function stringToBytes32(string memory source)
+        internal
+        pure
+        returns (bytes32 result)
+    {
+        bytes memory tempEmptyStringTest = bytes(source);
+        if (tempEmptyStringTest.length == 0) {
+            return 0x0;
+        }
+
+        assembly {
+            result := mload(add(source, 32))
+        }
     }
 }

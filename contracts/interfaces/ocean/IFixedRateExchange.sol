@@ -47,4 +47,33 @@ interface IFixedRateExchange {
             uint256 publishMarketFeeAmount,
             uint256 consumeMarketFeeAmount
         );
+
+    function getFeesInfo(bytes32 exchangeId)
+        external
+        view
+        returns (
+            uint256 marketFee,
+            address marketFeeCollector,
+            uint256 opcFee,
+            uint256 marketFeeAvailable,
+            uint256 oceanFeeAvailable
+        );
+
+    function getExchange(bytes32 exchangeId)
+        external
+        view
+        returns (
+            address exchangeOwner,
+            address datatoken,
+            uint256 dtDecimals,
+            address baseToken,
+            uint256 btDecimals,
+            uint256 fixedRate,
+            bool active,
+            uint256 dtSupply,
+            uint256 btSupply,
+            uint256 dtBalance,
+            uint256 btBalance,
+            bool withMint
+        );
 }
