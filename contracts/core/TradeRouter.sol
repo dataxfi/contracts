@@ -4,7 +4,7 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import "../interfaces/IUniV2Adapter.sol";
 import "../interfaces/ITradeRouter.sol";
-import "../interfaces/ICommunityFeeCollector.sol";
+import "../interfaces/IFeeCollector.sol";
 import "../interfaces/ocean/IPool.sol";
 import "../interfaces/ocean/IFactoryRouter.sol";
 import "../interfaces/ocean/IFixedRateExchange.sol";
@@ -17,7 +17,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 contract TradeRouter is ReentrancyGuard {
     using SafeMath for uint256;
-    ICommunityFeeCollector collector;
+    IFeeCollector collector;
     IStorage store;
     uint8 public version;
     uint256 private constant ZERO_FEES = 0;
