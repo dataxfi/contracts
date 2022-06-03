@@ -2,7 +2,7 @@ pragma solidity >=0.8.0 <0.9.0;
 
 //SPDX-License-Identifier: BSU-1.1
 
-interface IUniV2Adapter {
+interface IAdapter {
     /**
      *@dev swaps ETH to Exact  DT amounts
      *amountOut  is the exact tokens (DT) that you want .

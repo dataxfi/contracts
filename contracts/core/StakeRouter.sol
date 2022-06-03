@@ -2,7 +2,7 @@ pragma solidity >=0.8.0 <0.9.0;
 //Copyright of DataX Protocol contributors
 //SPDX-License-Identifier: BSU-1.1
 
-import "../interfaces/IUniV2Adapter.sol";
+import "../interfaces/IAdapter.sol";
 import "../interfaces/IFeeCollector.sol";
 import "../interfaces/ocean/IPool.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -85,7 +85,7 @@ contract StakeRouter is ReentrancyGuard, Math {
         require(info.path.length > 1, "StakeRouter: Path too short");
 
         //TODO: deduct trade fee + ref fee
-        IUniV2Adapter adapter = IUniV2Adapter(info.meta[3]);
+        IAdapter adapter = IAdapter(info.meta[3]);
         IERC20 baseToken = IERC20(info.path[info.path.length - 1]);
 
         //handle Pool swap
@@ -193,7 +193,7 @@ contract StakeRouter is ReentrancyGuard, Math {
         baseToken.approve(info.meta[3], baseAmountOut);
 
         //swap to output token
-        IUniV2Adapter adapter = IUniV2Adapter(info.meta[3]);
+        IAdapter adapter = IAdapter(info.meta[3]);
         //swap basetoken to ETH
         uint256[] memory amounts = adapter.getAmountsOut(
             baseAmountOut,
@@ -246,7 +246,7 @@ contract StakeRouter is ReentrancyGuard, Math {
 
         //skip if tokenIn is baseToken
         if (info.path.length > 1) {
-            IUniV2Adapter adapter = IUniV2Adapter(info.meta[3]);
+            IAdapter adapter = IAdapter(info.meta[3]);
             uint256[] memory amounts = adapter.getAmountsOut(
                 info.uints[2],
                 info.path
@@ -359,7 +359,7 @@ contract StakeRouter is ReentrancyGuard, Math {
         if (info.path.length > 1) {
             baseToken.approve(info.meta[3], baseAmountOut);
             //swap to output token
-            IUniV2Adapter adapter = IUniV2Adapter(info.meta[3]);
+            IAdapter adapter = IAdapter(info.meta[3]);
             //swap basetoken to Destination token
             uint256[] memory amounts = adapter.getAmountsOut(
                 baseAmountOut,
@@ -403,7 +403,7 @@ contract StakeRouter is ReentrancyGuard, Math {
 
         //skip if tokenOut is the baseToken
         if (info.path.length > 1) {
-            IUniV2Adapter adapter = IUniV2Adapter(info.meta[3]);
+            IAdapter adapter = IAdapter(info.meta[3]);
             uint256[] memory amounts = adapter.getAmountsOut(
                 info.uints[2],
                 info.path
@@ -435,7 +435,7 @@ contract StakeRouter is ReentrancyGuard, Math {
 
         //skip if tokenOut is the baseToken
         if (info.path.length > 1) {
-            IUniV2Adapter adapter = IUniV2Adapter(info.meta[3]);
+            IAdapter adapter = IAdapter(info.meta[3]);
             uint256[] memory amounts = adapter.getAmountsIn(
                 info.uints[0],
                 info.path
@@ -475,7 +475,7 @@ contract StakeRouter is ReentrancyGuard, Math {
 
         //skip if tokenOut is the baseToken
         if (info.path.length > 1) {
-            IUniV2Adapter adapter = IUniV2Adapter(info.meta[3]);
+            IAdapter adapter = IAdapter(info.meta[3]);
             uint256[] memory amountsOut = adapter.getAmountsOut(
                 baseAmountOut,
                 info.path
