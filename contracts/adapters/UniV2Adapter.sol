@@ -36,7 +36,7 @@ contract UniV2Adapter {
      * path
      * deadline
      */
-    function swapETHtoExactTokens(
+    function swapETHForExactTokens(
         uint256 amountOut,
         address[] calldata path,
         address to,
