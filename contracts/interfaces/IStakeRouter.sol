@@ -1,41 +1,58 @@
-pragma solidity  >=0.8.0 <0.9.0;
+pragma solidity >=0.8.0 <0.9.0;
+
 // SPDX-License-Identifier: BSU-1.1
+
+struct StakeInfo {
+    address[4] meta; //[pool, to, refAddress, adapterAddress]
+    uint256[3] uints; //[amountOut/minAmountOut, refFees, amountIn/maxAmountIn]
+    address[] path;
+}
 
 /** @notice : interface to stake any erc20 token in datapools
  */
-interface IStakeRouter  {
-
-/********* ETH ************/
+interface IStakeRouter {
+    /********* ETH ************/
 
     /** @dev stakes ETH (native token) into datapool
      */
-    function stakeETHInPool(TradeInfo info) external payable  returns (uint256 poolAmountOut){
+    function stakeETHInPool(StakeInfo calldata info)
+        external
+        payable
+        returns (uint256 poolAmountOut);
 
     /** @dev unstakes staked pool tokens into ETH from datapool
      */
-    function unstakeToETHFromPool(TradeInfo info) external returns (uint256 amountOut);
+    function unstakeToETHFromPool(StakeInfo calldata info)
+        external
+        returns (uint256 amountOut);
 
     /********* ERC20 ************/
 
-   /** @dev stakes given Erc20 token into datapool
+    /** @dev stakes given Erc20 token into datapool
      */
-    function stakeTokenInPool(TradeInfo info) external payable  returns (uint256 poolAmountOut){
+    function stakeTokenInPool(StakeInfo calldata info)
+        external
+        payable
+        returns (uint256 poolAmountOut);
 
     /** @dev unstakes staked pool tokens into given Erc20 from datapool
      */
-    function unstakeToTokenFromPool(TradeInfo info) external returns (uint256 amountOut);
+    function unstakeToTokenFromPool(StakeInfo calldata info)
+        external
+        returns (uint256 amountOut);
 
-
-    /********* DT ************/ 
+    /********* DT ************/
 
     /** @dev stakes given DT into given datapool
      */
-    function stakeDTInPool(TradeInfo info) external payable  returns (uint256 poolAmountOut){
+    function stakeDTInPool(StakeInfo calldata info)
+        external
+        payable
+        returns (uint256 poolAmountOut);
 
     /** @dev unstakes staked pool tokens into given DT from given datapool
      */
-    function unstakeDTFromPool(TradeInfo info) external returns (uint256 amountOut);
-
-
-
+    function unstakeDTFromPool(StakeInfo calldata info)
+        external
+        returns (uint256 amountOut);
 }

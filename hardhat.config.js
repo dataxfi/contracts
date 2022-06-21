@@ -19,18 +19,16 @@ task('accounts', 'Prints the list of accounts', async (taskArgs, hre) => {
  * @type import('hardhat/config').HardhatUserConfig
  */
 module.exports = {
-  defaultNetwork: 'rinkeby',
+  defaultNetwork: 'hardhat',
   networks: {
-    hardhat: {},
-    rinkeby: {
-      url: `https://rinkeby.infura.io/v3/${[process.env.INFURA]}`,
-      accounts: [process.env.PK1],
-    },
+    hardhat: {
+      forking: {
+        url: "https://polygon-mainnet.g.alchemy.com/v2/9NFuHnOvVLrD3QiASu65G4fqh9AiDZl5",
+        blockNumber: 29675155
+      },
+      allowUnlimitedContractSize: true
+    }
   },
-  etherscan: {
-    // Your API key for Etherscan
-    // Obtain one at https://etherscan.io/
-    apiKey: process.env.ETHERSCAN_API_KEY,
-  },
-  solidity: '0.8.0',
+  solidity: '0.8.12',
+
 }

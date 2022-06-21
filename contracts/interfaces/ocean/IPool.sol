@@ -1,19 +1,20 @@
 pragma solidity >=0.8.0 <0.9.0;
 
-// Copyright BigchainDB GmbH and Ocean Protocol contributors
-// SPDX-License-Identifier: (Apache-2.0 AND CC-BY-4.0)
-// Code is Apache-2.0 and docs are CC-BY-4.0
+//Copyright of DataX Protocol contributors
+//SPDX-License-Identifier: BSU-1.1
 
 interface IPool {
+    function balanceOf(address) external view returns (uint256);
+
     function swapExactAmountIn(
         address[3] calldata tokenInOutMarket, //[tokenIn,tokenOut,marketFeeAddress]
         uint256[4] calldata amountsInOutMaxFee //[tokenAmountIn,minAmountOut,maxPrice,_swapMarketFee]
-    ) external returns (uint256 tokenAmountOut, uint256 spotPriceAfter);
+    ) external returns (uint256, uint256);
 
     function swapExactAmountOut(
         address[3] calldata tokenInOutMarket, // [tokenIn,tokenOut,marketFeeAddress]
         uint256[4] calldata amountsInOutMaxFee // [maxAmountIn,tokenAmountOut,maxPrice,_swapMarketFee]
-    ) external returns (uint256 tokenAmountIn, uint256 spotPriceAfter);
+    ) external returns (uint256, uint256);
 
     function getAmountInExactOut(
         address tokenIn,
@@ -49,12 +50,32 @@ interface IPool {
 
     function exitswapPoolAmountIn(uint256 poolAmountIn, uint256 minAmountOut)
         external
-        returns (uint256 tokenAmountOut);
+        returns (uint256);
 
     function joinswapExternAmountIn(
         uint256 tokenAmountIn,
         uint256 minPoolAmountOut
-    ) external returns (uint256 poolAmountOut);
+    ) external returns (uint256);
+
+    function calcPoolInSingleOut(address tokenOut, uint256 tokenAmountOut)
+        external
+        view
+        returns (uint256);
+
+    function calcSingleOutPoolIn(address tokenOut, uint256 poolAmountIn)
+        external
+        view
+        returns (uint256);
+
+    function calcSingleInPoolOut(address tokenIn, uint256 poolAmountOut)
+        external
+        view
+        returns (uint256);
+
+    function calcPoolOutSingleIn(address tokenIn, uint256 tokenAmountIn)
+        external
+        view
+        returns (uint256);
 
     function transfer(address to, uint256 amount) external;
 }

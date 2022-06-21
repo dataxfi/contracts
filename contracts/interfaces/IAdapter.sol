@@ -15,7 +15,7 @@ interface IAdapter {
         address[] calldata path,
         address to,
         address refundTo
-    ) external payable returns (uint256[2] memory amountsOut);
+    ) external payable returns (uint256 amtOut, uint256 refund);
 
     /** @dev swaps Exact ETH to Tokens (as DT in tradeRouter).
      * amountOutMin minimum output amount
@@ -27,7 +27,7 @@ interface IAdapter {
         uint256 amountOutMin,
         address[] calldata path,
         address to
-    ) external payable returns (uint256[2] memory amountsOut);
+    ) external payable returns (uint256 amtOut);
 
     /** @dev swaps Exact Tokens (DT) for WETH
      * amountIn exact token input amount
@@ -41,7 +41,7 @@ interface IAdapter {
         uint256 amountOutMin,
         address[] calldata path,
         address to
-    ) external payable returns (uint256 amountsOut);
+    ) external payable returns (uint256 amtOut);
 
     /** @dev swaps Exact Tokens (DT/ERC20) for Tokens(DT/ERC20) ,
      * amountIn exact token input amount
@@ -54,7 +54,7 @@ interface IAdapter {
         uint256 amountOutMin,
         address[] calldata path,
         address to
-    ) external returns (uint256 amountOut);
+    ) external returns (uint256 amtOut);
 
     /** @dev swaps Tokens (DT / ERC20) for Exact tokens  (DT / ERC20)
      * amountOut expected output amount
@@ -70,7 +70,7 @@ interface IAdapter {
         address[] calldata path,
         address to,
         address refundTo
-    ) external returns (uint256[] memory amountsOut);
+    ) external returns (uint256 amtOut, uint256 refund);
 
     function getAmountsOut(uint256 amountIn, address[] memory path)
         external

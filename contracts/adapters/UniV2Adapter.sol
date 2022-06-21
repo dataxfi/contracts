@@ -7,27 +7,27 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract UniV2Adapter {
     IUniswapV2Router02 uniswapRouter;
     using SafeERC20 for ERC20;
     using SafeMath for uint256;
-    uint256 public currentVersion;
+    uint256 public version;
     uint256 private constant DEADLINE = 600; //10 mins
 
     event Swapped(address[] path, uint256 amountOut);
 
-    constructor(address _routerAddress, uint256 _currentVersion) {
+    constructor(address _routerAddress, uint256 _version) {
         uniswapRouter = IUniswapV2Router02(_routerAddress);
-        currentVersion = _currentVersion;
+        version = _version;
     }
 
     //check if this contract has needed spending allowance
     modifier hasAllowance(address tokenAddress, uint256 amount) {
         IERC20 token = IERC20(tokenAddress);
         uint256 _allowance = token.allowance(msg.sender, address(this));
-        require(_allowance >= amount, "Error: Not enough allowance");
+        require(_allowance >= amount, "UniV2Adapter: Not enough allowance");
         _;
     }
 
@@ -36,27 +36,26 @@ contract UniV2Adapter {
      * path
      * deadline
      */
-    function swapETHtoExactTokens(
+    function swapETHForExactTokens(
         uint256 amountOut,
         address[] calldata path,
         address to,
         address refundTo
-    ) external payable returns (uint256 amtOut) {
+    ) external payable returns (uint256 tokenAmountOut, uint256 refund) {
         //swap ETH to exact tokens
         uint256[] memory amounts = uniswapRouter.swapETHForExactTokens{
             value: msg.value
         }(amountOut, path, to, block.timestamp + DEADLINE);
 
         //output token amount
-        amtOut = amounts[amounts.length - 1];
+        tokenAmountOut = amounts[amounts.length - 1];
+        refund = msg.value.sub(amounts[0]);
 
         //refund remaining ETH
-        (bool refunded, ) = payable(refundTo).call{
-            value: msg.value.sub(amounts[0])
-        }("");
-        require(refunded, "Error: ETH refund failed");
+        (bool refunded, ) = payable(refundTo).call{value: refund}("");
+        require(refunded, "UniV2Adapter: ETH refund failed");
 
-        emit Swapped(path, amtOut);
+        emit Swapped(path, tokenAmountOut);
     }
 
     /** @dev swaps Exact ETH to Tokens
@@ -69,14 +68,14 @@ contract UniV2Adapter {
         uint256 amountOutMin,
         address[] calldata path,
         address to
-    ) external payable returns (uint256 amtOut) {
+    ) external payable returns (uint256 tokenAmountOut) {
         //swap exact ETH to tokens
         uint256[] memory amounts = uniswapRouter.swapExactETHForTokens{
             value: msg.value
         }(amountOutMin, path, to, block.timestamp + DEADLINE);
         //output token amount
-        amtOut = amounts[amounts.length - 1];
-        emit Swapped(path, amtOut);
+        tokenAmountOut = amounts[amounts.length - 1];
+        emit Swapped(path, tokenAmountOut);
     }
 
     /** @dev swaps Tokens for Exact ETH
@@ -105,11 +104,11 @@ contract UniV2Adapter {
                 address(this),
                 amountInMax
             ),
-            "Error: Failed to self transfer"
+            "UniV2Adapter: Failed to self transfer"
         );
         require(
             IERC20(path[0]).approve(address(uniswapRouter), amountInMax),
-            "Error: Failed to approve UniV2Router"
+            "UniV2Adapter: Failed to approve UniV2Router"
         );
 
         //swap tokens to exact ETH
@@ -126,7 +125,7 @@ contract UniV2Adapter {
         //refund remaining tokens
         require(
             IERC20(path[0]).transfer(refundTo, amountInMax.sub(amounts[0])),
-            "Error: Token refund failed"
+            "UniV2Adapter: Token refund failed"
         );
     }
 
@@ -147,11 +146,11 @@ contract UniV2Adapter {
         IERC20 token = IERC20(path[0]);
         require(
             token.transferFrom(msg.sender, address(this), amountIn),
-            "Error: Failed to self transfer"
+            "UniV2Adapter: Failed to self transfer"
         );
         require(
             token.approve(address(uniswapRouter), amountIn),
-            "Error: Failed to approve UniV2Router"
+            "UniV2Adapter: Failed to approve UniV2Router"
         );
 
         //swap exact tokens to ETH
@@ -183,11 +182,11 @@ contract UniV2Adapter {
         IERC20 token = IERC20(path[0]);
         require(
             token.transferFrom(msg.sender, address(this), amountIn),
-            "Error: Failed to self transfer"
+            "UniV2Adapter: Failed to self transfer"
         );
         require(
             token.approve(address(uniswapRouter), amountIn),
-            "Error: Failed to approve UniV2Router"
+            "UniV2Adapter: Failed to approve UniV2Router"
         );
 
         //swap exact tokens to tokens
@@ -217,7 +216,11 @@ contract UniV2Adapter {
         address[] calldata path,
         address to,
         address refundTo
-    ) external hasAllowance(path[0], amountInMax) returns (uint256 amtOut) {
+    )
+        external
+        hasAllowance(path[0], amountInMax)
+        returns (uint256 tokenAmountOut, uint256 refund)
+    {
         //approve Uni router to spend
         require(
             IERC20(path[0]).transferFrom(
@@ -225,11 +228,11 @@ contract UniV2Adapter {
                 address(this),
                 amountInMax
             ),
-            "Error: Failed to self transfer"
+            "UniV2Adapter: Failed to self transfer"
         );
         require(
             IERC20(path[0]).approve(address(uniswapRouter), amountInMax),
-            "Error: Failed to approve UniV2Router"
+            "UniV2Adapter: Failed to approve UniV2Router"
         );
 
         // swap tokens to exact tokens
@@ -240,14 +243,12 @@ contract UniV2Adapter {
             to,
             block.timestamp + DEADLINE
         );
-
-        //output token amount
-        amtOut = amounts[amounts.length - 1];
-
+        tokenAmountOut = amounts[amounts.length - 1];
+        refund = amountInMax.sub(amounts[0]);
         //refund remaining tokens
         require(
-            IERC20(path[0]).transfer(refundTo, amountInMax.sub(amounts[0])),
-            "Error: Token refund failed"
+            IERC20(path[0]).transfer(refundTo, refund),
+            "UniV2Adapter: Token refund failed"
         );
     }
 

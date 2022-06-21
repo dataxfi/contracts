@@ -3,7 +3,6 @@ pragma solidity >=0.8.0 <0.9.0;
 //SPDX-License-Identifier: BSU-1.1
 
 import "../interfaces/IAdapter.sol";
-import "../interfaces/IFeeCollector.sol";
 import "../interfaces/ocean/IPool.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
@@ -13,7 +12,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 contract StakeRouter is ReentrancyGuard, Math {
     using SafeMath for uint256;
-    IFeeCollector collector;
     IStorage store;
     uint8 public version;
     mapping(address => uint256) public referralFees;

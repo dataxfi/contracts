@@ -4,6 +4,21 @@ pragma solidity >=0.8.0 <0.9.0;
 //SPDX-License-Identifier: BSU-1.1
 
 interface IFixedRateExchange {
+    struct Exchange {
+        bool active;
+        address exchangeOwner;
+        address datatoken;
+        address baseToken;
+        uint256 fixedRate;
+        uint256 dtDecimals;
+        uint256 btDecimals;
+        uint256 dtBalance;
+        uint256 btBalance;
+        uint256 marketFee;
+        uint256 oceanFeeAvailable;
+        bool withMint;
+    }
+
     function buyDT(
         bytes32 exchangeId,
         uint256 datatokenAmount,
@@ -47,6 +62,13 @@ interface IFixedRateExchange {
             uint256 publishMarketFeeAmount,
             uint256 consumeMarketFeeAmount
         );
+
+    function getRate(bytes32 exchangeId) external view returns (uint256);
+
+    function getAllowedSwapper(bytes32 exchangeId)
+        external
+        view
+        returns (address);
 
     function getFeesInfo(bytes32 exchangeId)
         external

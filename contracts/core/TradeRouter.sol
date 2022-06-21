@@ -2,9 +2,8 @@ pragma solidity >=0.8.0 <0.9.0;
 //Copyright of DataX Protocol contributors
 //SPDX-License-Identifier: BSU-1.1
 
-import "../interfaces/IUniV2Adapter.sol";
+import "../interfaces/IAdapter.sol";
 import "../interfaces/ITradeRouter.sol";
-import "../interfaces/IFeeCollector.sol";
 import "../interfaces/ocean/IPool.sol";
 import "../interfaces/ocean/IFactoryRouter.sol";
 import "../interfaces/ocean/IFixedRateExchange.sol";
@@ -14,15 +13,22 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "../utils/Math.sol";
+import "../interfaces/IPoolRouter.sol";
+import "../interfaces/IFRERouter.sol";
+import "hardhat/console.sol";
 
-contract TradeRouter is ReentrancyGuard {
+contract TradeRouter is ReentrancyGuard, Math {
     using SafeMath for uint256;
-    IFeeCollector collector;
     IStorage store;
     uint8 public version;
+    mapping(address => uint256) public referralFees;
+    string public constant TRADE_FEE_TYPE = "TRADE";
     uint256 private constant ZERO_FEES = 0;
     uint256 private constant MAX_INT = 2**256 - 1;
     uint256 private constant BASE = 1e18;
+    IPoolRouter private poolRouter;
+    IFRERouter private freRouter;
 
     event TradedETHToDataToken(
         address indexed tokenOut,
@@ -38,263 +44,98 @@ contract TradeRouter is ReentrancyGuard {
         uint256 amountOut
     );
 
-    struct Fees {
-        uint256 baseTokenAmount;
-        uint256 oceanFeeAmount;
-        uint256 publishMarketFeeAmount;
-        uint256 consumeMarketFeeAmount;
+    struct Exchange {
+        uint256 dtDecimals;
+        uint256 btDecimals;
+        uint256 fixedRate;
+        uint256 marketFee;
+        uint256 oceanFee;
     }
 
     struct TradeInfo {
         address[5] meta; //[source, dtAddress, to, refAddress, adapterAddress]
-        uint256[3] uints; //[dtAmountOut/minDTAmountOut/tokenAmountOut/minTokenAmountOut, refFees, dtAmountIn/maxDTAmountIn/tokenAmountIn/maxTokenAmountIn]
+        uint256[4] uints; //[exactAmountIn/maxAmountIn, baseAmountNeeded, exactAmountOut/minAmountOut, refFees]
         address[] path;
         bool isFRE;
         bytes32 exchangeId;
     }
 
-    constructor(uint8 _version, address _storage) {
+    constructor(
+        uint8 _version,
+        address _storage,
+        address _poolRouter,
+        address _freRouter
+    ) {
         version = _version;
         store = IStorage(_storage);
+        poolRouter = IPoolRouter(_poolRouter);
+        freRouter = IFRERouter(_freRouter);
     }
 
     function swapETHToExactDatatoken(TradeInfo calldata info)
         external
         payable
         nonReentrant
-        returns (uint256 amountOut)
+        returns (
+            uint256 baseRefund,
+            uint256 ethRefund,
+            uint256 dataxFee,
+            uint256 refFee
+        )
     {
         require(
             info.meta[2] != address(0),
             "TradeRouter: Destination address not provided"
         );
-
-        //TODO: deduct trade fee + ref fee
-        IUniV2Adapter adapter = IUniV2Adapter(info.meta[4]);
-        IERC20 baseToken = IERC20(info.path[info.path.length - 1]);
-
-        //swap quote token to dt
-        if (info.isFRE) {
-            //handle FRE swap
-            IFixedRateExchange exchange = IFixedRateExchange(info.meta[0]);
-            //calc base amount In
-            (uint256 baseAmountOut, , , ) = exchange.calcBaseInGivenOutDT(
-                info.exchangeId,
-                info.uints[0],
-                ZERO_FEES
-            );
-            //swap ETH to pool base token
-            amountOut = adapter.swapETHForExactTokens{value: msg.value}(
-                baseAmountOut,
-                info.path,
-                address(this),
-                msg.sender
-            );
-
-            //approve Exchange to spend base token
-            require(
-                baseToken.approve(address(exchange), amountOut),
-                "TradeRouter: Failed to approve Basetoken on FRE"
-            );
-
-            uint256 preBalance = baseToken.balanceOf(address(this));
-            exchange.buyDT(
-                info.exchangeId,
-                info.uints[0],
-                amountOut,
-                address(0),
-                ZERO_FEES
-            );
-            uint256 postBalance = baseToken.balanceOf(address(this));
-            uint256 tokensToRefund = amountOut.sub(preBalance.sub(postBalance));
-
-            if (tokensToRefund > 0) {
-                //refund remaining base tokens
-                require(
-                    baseToken.transfer(info.meta[2], tokensToRefund),
-                    "TradeRouter: Basetoken refund failed"
-                );
-            }
-        } else {
-            //handle Pool swap
-            IPool pool = IPool(info.meta[0]);
-            //calc base amountIn
-            (uint256 baseAmountOut, , , , ) = pool.getAmountInExactOut(
-                info.path[info.path.length - 1],
-                info.meta[1],
-                info.uints[0],
-                ZERO_FEES
-            );
-            //swap ETH to dtpool quote token
-            amountOut = adapter.swapETHForExactTokens{value: msg.value}(
-                baseAmountOut,
-                info.path,
-                address(this),
-                msg.sender
-            );
-            //approve Pool to spend base token
-            require(
-                baseToken.approve(address(pool), amountOut),
-                "TradeRouter: Failed to approve Basetoken on Pool"
-            );
-
-            address[3] memory tokenInOutMarket = [
-                info.path[info.path.length - 1],
-                info.meta[1],
-                address(0)
-            ];
-            uint256[4] memory amountsInOutMaxFee = [
-                amountOut,
-                info.uints[0],
-                MAX_INT,
-                ZERO_FEES
-            ];
-            (uint256 amountIn, ) = pool.swapExactAmountOut(
-                tokenInOutMarket,
-                amountsInOutMaxFee
-            );
-
-            //refund remaining base tokens
-            uint256 tokensToRefund = amountOut.sub(amountIn);
-            if (tokensToRefund > 0) {
-                require(
-                    baseToken.transfer(info.meta[2], tokensToRefund),
-                    "TradeRouter: Basetoken refund failed"
-                );
-            }
-        }
-
-        //transfer dt to destination address
-        require(
-            IERC20(info.meta[1]).transfer(info.meta[2], info.uints[0]),
-            "Error: DT transfer failed"
+        IAdapter adapter = IAdapter(info.meta[4]);
+        uint256 baseAmountOutSansFee;
+        (dataxFee, refFee) = calcFees(
+            info.uints[1],
+            TRADE_FEE_TYPE,
+            info.uints[3]
         );
+        console.log("TR : baseAmountOut - ", info.uints[1]);
+        uint256 baseAmountNeeded = info.uints[1].add(dataxFee).add(refFee);
+        console.log("TR : baseAmountNeeded - ", baseAmountNeeded);
+        (baseAmountOutSansFee, ethRefund) = adapter.swapETHForExactTokens{
+            value: msg.value
+        }(baseAmountNeeded, info.path, address(this), msg.sender);
+        console.log("TR : baseAmountOutSansFee - ", baseAmountOutSansFee);
+        uint256 baseAmountIn = baseAmountOutSansFee.sub(dataxFee.add(refFee));
+        console.log("TR : baseAmountIn - ", baseAmountIn);
+        if (info.meta[2] != address(0)) {
+            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+        }
+        if (info.isFRE) {
+            IERC20(info.path[info.path.length - 1]).approve(
+                address(freRouter),
+                baseAmountIn
+            );
+            (, baseRefund) = freRouter.swapBaseTokenToExactDatatoken(
+                info.path[info.path.length - 1],
+                info.meta[2],
+                info.meta[0],
+                info.exchangeId,
+                baseAmountIn,
+                info.uints[2]
+            );
+        } else {
+            IERC20(info.path[info.path.length - 1]).approve(
+                address(poolRouter),
+                baseAmountIn
+            );
+            (, baseRefund) = poolRouter.swapBaseTokenToExactDatatoken(
+                info.path[info.path.length - 1],
+                info.meta[1],
+                info.meta[2],
+                info.meta[0],
+                baseAmountIn,
+                info.uints[2]
+            );
+        }
 
         emit TradedETHToDataToken(
             info.meta[1],
-            msg.sender,
-            info.meta[2],
-            info.uints[0]
-        );
-    }
-
-    function swapTokenToExactDatatoken(TradeInfo calldata info)
-        external
-        payable
-        nonReentrant
-        returns (uint256 amountOut)
-    {
-        require(
-            info.meta[2] != address(0),
-            "TradeRouter: Destination address not provided"
-        );
-
-        //TODO: deduct trade fee + ref fee
-        IUniV2Adapter adapter = IUniV2Adapter(info.meta[4]);
-        IERC20 baseToken = IERC20(info.path[info.path.length - 1]);
-
-        //swap quote token to dt
-        if (info.isFRE) {
-            //handle FRE swap
-            IFixedRateExchange exchange = IFixedRateExchange(info.meta[0]);
-            //calc base amount In
-            (uint256 baseAmountOut, , , ) = exchange.calcBaseInGivenOutDT(
-                info.exchangeId,
-                info.uints[0],
-                ZERO_FEES
-            );
-            //swap ETH to pool base token
-            amountOut = adapter.swapTokensForExactTokens(
-                baseAmountOut,
-                info.uints[2],
-                info.path,
-                address(this),
-                msg.sender
-            );
-
-            //approve Exchange to spend base token
-            require(
-                baseToken.approve(address(exchange), amountOut),
-                "TradeRouter: Failed to approve Basetoken on FRE"
-            );
-
-            uint256 preBalance = baseToken.balanceOf(address(this));
-            exchange.buyDT(
-                info.exchangeId,
-                info.uints[0],
-                amountOut,
-                address(0),
-                ZERO_FEES
-            );
-            uint256 postBalance = baseToken.balanceOf(address(this));
-            uint256 tokensToRefund = amountOut.sub(preBalance.sub(postBalance));
-
-            if (tokensToRefund > 0) {
-                //refund remaining base tokens
-                require(
-                    baseToken.transfer(info.meta[2], tokensToRefund),
-                    "TradeRouter: Basetoken refund failed"
-                );
-            }
-        } else {
-            //handle Pool swap
-            IPool pool = IPool(info.meta[0]);
-            //calc base amountIn
-            (uint256 baseAmountOut, , , , ) = pool.getAmountInExactOut(
-                info.path[info.path.length - 1],
-                info.meta[1],
-                info.uints[0],
-                ZERO_FEES
-            );
-            //swap ETH to dtpool quote token
-            amountOut = adapter.swapTokensForExactTokens(
-                baseAmountOut,
-                info.uints[2],
-                info.path,
-                address(this),
-                msg.sender
-            );
-            //approve Pool to spend base token
-            require(
-                baseToken.approve(address(pool), amountOut),
-                "TradeRouter: Failed to approve Basetoken on Pool"
-            );
-
-            address[3] memory tokenInOutMarket = [
-                info.path[info.path.length - 1],
-                info.meta[1],
-                address(0)
-            ];
-            uint256[4] memory amountsInOutMaxFee = [
-                amountOut,
-                info.uints[0],
-                MAX_INT,
-                ZERO_FEES
-            ];
-            (uint256 amountIn, ) = pool.swapExactAmountOut(
-                tokenInOutMarket,
-                amountsInOutMaxFee
-            );
-
-            //refund remaining base tokens
-            uint256 tokensToRefund = amountOut.sub(amountIn);
-            if (tokensToRefund > 0) {
-                require(
-                    baseToken.transfer(info.meta[2], tokensToRefund),
-                    "TradeRouter: Basetoken refund failed"
-                );
-            }
-        }
-
-        //transfer dt to destination address
-        require(
-            IERC20(info.meta[1]).transfer(info.meta[2], info.uints[0]),
-            "Error: DT transfer failed"
-        );
-
-        emit TradedTokenToDataToken(
-            info.meta[1],
-            info.path[0],
             msg.sender,
             info.meta[2],
             info.uints[2]
@@ -305,268 +146,423 @@ contract TradeRouter is ReentrancyGuard {
         external
         payable
         nonReentrant
-        returns (uint256 amountOut)
+        returns (
+            uint256 dtAmountOut,
+            uint256 dataxFee,
+            uint256 refFee
+        )
+    {
+        require(
+            info.meta[2] != address(0),
+            "TradeRouter: Destination address not provided"
+        );
+        IAdapter adapter = IAdapter(info.meta[4]);
+        (dataxFee, refFee) = calcFees(
+            info.uints[1],
+            TRADE_FEE_TYPE,
+            info.uints[3]
+        );
+        uint256 baseAmountOutSansFee = adapter.swapExactETHForTokens{
+            value: msg.value
+        }(info.uints[1], info.path, address(this));
+        uint256 baseAmountIn = baseAmountOutSansFee.sub(dataxFee.add(refFee));
+        if (info.meta[2] != address(0)) {
+            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+        }
+        if (info.isFRE) {
+            IERC20(info.path[info.path.length - 1]).approve(
+                address(freRouter),
+                baseAmountIn
+            );
+            freRouter.swapBaseTokenToExactDatatoken(
+                info.path[info.path.length - 1],
+                info.meta[2],
+                info.meta[0],
+                info.exchangeId,
+                baseAmountIn,
+                info.uints[2]
+            );
+            dtAmountOut = info.uints[2];
+        } else {
+            IERC20(info.path[info.path.length - 1]).approve(
+                address(poolRouter),
+                baseAmountIn
+            );
+            dtAmountOut = poolRouter.swapExactBaseTokenToDatatoken(
+                info.path[info.path.length - 1],
+                info.meta[1],
+                info.meta[2],
+                info.meta[0],
+                baseAmountIn,
+                info.uints[2]
+            );
+        }
+
+        emit TradedETHToDataToken(
+            info.meta[1],
+            msg.sender,
+            info.meta[2],
+            info.uints[2]
+        );
+    }
+
+    function swapTokenToExactDatatoken(TradeInfo calldata info)
+        external
+        nonReentrant
+        returns (
+            uint256 baseRefund,
+            uint256 tokenInRefund,
+            uint256 dataxFee,
+            uint256 refFee
+        )
     {
         require(
             info.meta[2] != address(0),
             "TradeRouter: Destination address not provided"
         );
 
-        IUniV2Adapter adapter = IUniV2Adapter(info.meta[4]);
-        IERC20 baseToken = IERC20(info.path[info.path.length - 1]);
-
-        //swap ETH to base token
-        uint256[] memory amounts = adapter.getAmountsOut(msg.value, info.path);
-        amountOut = adapter.swapExactETHForTokens{value: msg.value}(
-            amounts[info.path.length - 1],
-            info.path,
-            address(this)
+        IERC20 tokenIn = IERC20(info.path[0]);
+        require(
+            tokenIn.transferFrom(msg.sender, address(this), info.uints[0]),
+            "TradeRouter: Self-transfer TokenIn Failed"
         );
 
-        //swap quote token to DT
+        (dataxFee, refFee) = calcFees(
+            info.uints[1],
+            TRADE_FEE_TYPE,
+            info.uints[3]
+        );
+
+        uint256 baseAmountNeeded = info.uints[1].add(dataxFee).add(refFee);
+
+        if (info.path.length > 1) {
+            tokenIn.approve(info.meta[4], info.uints[0]);
+            IAdapter adapter = IAdapter(info.meta[4]);
+            (baseAmountNeeded, tokenInRefund) = adapter
+                .swapTokensForExactTokens(
+                    baseAmountNeeded,
+                    info.uints[0],
+                    info.path,
+                    address(this),
+                    msg.sender
+                );
+        }
+        uint256 baseAmountIn = baseAmountNeeded.sub(dataxFee.add(refFee));
+        if (info.meta[2] != address(0)) {
+            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+        }
         if (info.isFRE) {
-            //handle FRE swap
-            IFixedRateExchange exchange = IFixedRateExchange(info.meta[0]);
-
-            //calc base amount In
-            (uint256 baseAmtPerDT, , , ) = exchange.calcBaseInGivenOutDT(
+            IERC20(info.path[info.path.length - 1]).approve(
+                address(freRouter),
+                baseAmountIn
+            );
+            (, baseRefund) = freRouter.swapBaseTokenToExactDatatoken(
+                info.path[info.path.length - 1],
+                info.meta[2],
+                info.meta[0],
                 info.exchangeId,
-                BASE,
-                ZERO_FEES
-            );
-            uint256 expectedDTAmt = amountOut.div(baseAmtPerDT);
-
-            require(
-                expectedDTAmt >= info.uints[0],
-                "TradeRouter: Insufficient datatoken received"
-            );
-            require(
-                baseToken.approve(address(exchange), amountOut),
-                "TradeRouter: Failed to approve Basetoken on FRE"
-            );
-            exchange.buyDT(
-                info.exchangeId,
-                expectedDTAmt,
-                amountOut,
-                address(0),
-                ZERO_FEES
-            );
-
-            //transfer DT to destination address
-            require(
-                IERC20(info.meta[1]).transfer(info.meta[2], expectedDTAmt),
-                "Error: DT transfer failed"
+                baseAmountIn,
+                info.uints[2]
             );
         } else {
-            //handle Pool swap
-            IPool pool = IPool(info.meta[0]);
-
-            //approve Pool to spend base token
-            require(
-                baseToken.approve(address(pool), amountOut),
-                "TradeRouter: Failed to approve Basetoken on Pool"
+            IERC20(info.path[info.path.length - 1]).approve(
+                address(poolRouter),
+                baseAmountIn
             );
-
-            address[3] memory tokenInOutMarket = [
+            (, baseRefund) = poolRouter.swapBaseTokenToExactDatatoken(
                 info.path[info.path.length - 1],
                 info.meta[1],
-                address(0)
-            ];
-            uint256[4] memory amountsInOutMaxFee = [
-                amountOut,
-                info.uints[0],
-                MAX_INT,
-                ZERO_FEES
-            ];
-            (uint256 amtOut, ) = pool.swapExactAmountIn(
-                tokenInOutMarket,
-                amountsInOutMaxFee
-            );
-
-            //transfer DT to destination address
-            require(
-                IERC20(info.meta[1]).transfer(info.meta[2], amtOut),
-                "Error: DT transfer failed"
+                info.meta[2],
+                info.meta[0],
+                baseAmountIn,
+                info.uints[2]
             );
         }
-        emit TradedETHToDataToken(
+
+        emit TradedTokenToDataToken(
             info.meta[1],
+            info.path[0],
             msg.sender,
             info.meta[2],
-            info.uints[0]
+            info.uints[2]
         );
     }
 
-    function calcDTOutGivenTokenIn(TradeInfo calldata info)
+    function swapExactTokenToDatatoken(TradeInfo calldata info)
+        external
+        nonReentrant
+        returns (
+            uint256 dtAmountOut,
+            uint256 dataxFee,
+            uint256 refFee
+        )
+    {
+        require(
+            info.meta[2] != address(0),
+            "TradeRouter: Destination address not provided"
+        );
+
+        IERC20 tokenIn = IERC20(info.path[0]);
+        require(
+            tokenIn.transferFrom(msg.sender, address(this), info.uints[0]),
+            "TradeRouter: Self-transfer TokenIn Failed"
+        );
+
+        uint256 baseAmountOutSansFee = info.uints[1];
+
+        (dataxFee, refFee) = calcFees(
+            baseAmountOutSansFee,
+            TRADE_FEE_TYPE,
+            info.uints[3]
+        );
+
+        if (info.path.length > 1) {
+            tokenIn.approve(info.meta[4], info.uints[0]);
+            IAdapter adapter = IAdapter(info.meta[4]);
+            baseAmountOutSansFee = adapter.swapExactTokensForTokens(
+                info.uints[0],
+                baseAmountOutSansFee,
+                info.path,
+                address(this)
+            );
+        }
+        uint256 baseAmountIn = baseAmountOutSansFee.sub(dataxFee.add(refFee));
+        if (info.meta[2] != address(0)) {
+            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+        }
+        if (info.isFRE) {
+            IERC20(info.path[info.path.length - 1]).approve(
+                address(freRouter),
+                baseAmountIn
+            );
+            freRouter.swapBaseTokenToExactDatatoken(
+                info.path[info.path.length - 1],
+                info.meta[2],
+                info.meta[0],
+                info.exchangeId,
+                baseAmountIn,
+                info.uints[2]
+            );
+            dtAmountOut = info.uints[2];
+        } else {
+            IERC20(info.path[info.path.length - 1]).approve(
+                address(poolRouter),
+                baseAmountIn
+            );
+            dtAmountOut = poolRouter.swapExactBaseTokenToDatatoken(
+                info.path[info.path.length - 1],
+                info.meta[1],
+                info.meta[2],
+                info.meta[0],
+                baseAmountIn,
+                info.uints[2]
+            );
+        }
+
+        emit TradedTokenToDataToken(
+            info.meta[1],
+            info.path[0],
+            msg.sender,
+            info.meta[2],
+            info.uints[2]
+        );
+    }
+
+    /********** Calculations *************/
+
+    // calculate DT Out Token In
+    function calcDatatokenOutGivenTokenIn(TradeInfo calldata info)
         public
         view
-        returns (uint256 amountOut)
+        returns (
+            uint256 dtAmountOut,
+            uint256 baseAmountNeeded,
+            uint256 dataxFee,
+            uint256 refFee
+        )
     {
-        IUniV2Adapter adapter = IUniV2Adapter(info.meta[4]);
-        uint256[] memory amounts = adapter.getAmountsOut(
+        baseAmountNeeded = info.uints[0];
+
+        if (info.path.length > 1) {
+            IAdapter adapter = IAdapter(info.meta[4]);
+            uint256[] memory amounts = adapter.getAmountsOut(
+                info.uints[0],
+                info.path
+            );
+            baseAmountNeeded = amounts[amounts.length - 1];
+        }
+
+        (dataxFee, refFee) = calcFees(
+            baseAmountNeeded,
+            TRADE_FEE_TYPE,
+            info.uints[3]
+        );
+        uint256 baseAmountIn = baseAmountNeeded.sub(dataxFee.add(refFee));
+        if (info.isFRE) {
+            dtAmountOut = freRouter.calcDatatokenOutGivenBaseTokenIn(
+                info.meta[0],
+                info.exchangeId,
+                baseAmountIn
+            );
+        } else {
+            IPool pool = IPool(info.meta[0]);
+            (dtAmountOut, , , , ) = pool.getAmountOutExactIn(
+                info.path[info.path.length - 1],
+                info.meta[1],
+                baseAmountIn,
+                ZERO_FEES
+            );
+        }
+    }
+
+    // calculate Token Out DT In
+    function calcTokenOutGivenDatatokenIn(TradeInfo calldata info)
+        public
+        view
+        returns (
+            uint256 tokenAmountOut,
+            uint256 baseAmountNeeded,
+            uint256 dataxFee,
+            uint256 refFee
+        )
+    {
+        // calc DT -> BT
+        if (info.isFRE) {
+            baseAmountNeeded = freRouter.calcBaseTokenOutGivenDatatokenIn(
+                info.meta[0],
+                info.exchangeId,
+                info.uints[0]
+            );
+        } else {
+            IPool pool = IPool(info.meta[0]);
+            (baseAmountNeeded, , , , ) = pool.getAmountInExactOut(
+                info.meta[1],
+                info.path[info.path.length - 1],
+                info.uints[0],
+                ZERO_FEES
+            );
+        }
+        //calc Fee
+        (dataxFee, refFee) = calcFees(
+            baseAmountNeeded,
+            TRADE_FEE_TYPE,
+            info.uints[3]
+        );
+
+        tokenAmountOut = baseAmountNeeded.sub(dataxFee.add(refFee));
+        if (info.path.length > 1) {
+            // calc BT -> Token
+            IAdapter adapter = IAdapter(info.meta[4]);
+            uint256[] memory amountsIn = adapter.getAmountsIn(
+                tokenAmountOut,
+                info.path
+            );
+            tokenAmountOut = amountsIn[0];
+        }
+    }
+
+    // calculate DT In Token Out
+    function calcDatatokenInGivenTokenOut(TradeInfo calldata info)
+        public
+        view
+        returns (
+            uint256 dtAmountIn,
+            uint256 baseAmountNeeded,
+            uint256 dataxFee,
+            uint256 refFee
+        )
+    {
+        IAdapter adapter = IAdapter(info.meta[4]);
+        uint256[] memory amounts = adapter.getAmountsIn(
             info.uints[2],
             info.path
         );
-        IPool pool = IPool(info.meta[0]);
-        (amountOut, , , , ) = pool.getAmountOutExactIn(
-            info.path[info.path.length - 1],
-            info.meta[1],
-            amounts[amounts.length - 1],
-            ZERO_FEES
+        baseAmountNeeded = amounts[0];
+        (dataxFee, refFee) = calcFees(
+            baseAmountNeeded,
+            TRADE_FEE_TYPE,
+            info.uints[3]
         );
-    }
-
-    function calcTokenOutGivenDTIn(TradeInfo calldata info)
-        public
-        view
-        returns (uint256 amountOut)
-    {
-        uint256 amountIn;
+        uint256 baseAmountOut = baseAmountNeeded.add(dataxFee.add(refFee));
         if (info.isFRE) {
-            IFixedRateExchange exchange = IFixedRateExchange(info.meta[0]);
-            (amountIn, , , ) = exchange.calcBaseOutGivenInDT(
+            dtAmountIn = freRouter.calcDatatokenInGivenBaseTokenOut(
+                info.meta[0],
                 info.exchangeId,
-                info.uints[2],
-                ZERO_FEES
+                baseAmountOut
             );
         } else {
             IPool pool = IPool(info.meta[0]);
-            (amountIn, , , , ) = pool.getAmountInExactOut(
+            (dtAmountIn, , , , ) = pool.getAmountInExactOut(
                 info.meta[1],
-                info.path[info.path.length - 1],
-                info.uints[2],
-                ZERO_FEES
-            );
-        }
-
-        IUniV2Adapter adapter = IUniV2Adapter(info.meta[4]);
-        uint256[] memory amountsOut = adapter.getAmountsOut(
-            amountIn,
-            info.path
-        );
-        amountOut = amountsOut[amountsOut.length - 1];
-    }
-
-    function calcDTInGivenTokenOut(TradeInfo calldata info)
-        public
-        view
-        returns (uint256 amountIn)
-    {
-        IUniV2Adapter adapter = IUniV2Adapter(info.meta[4]);
-        uint256[] memory amounts = adapter.getAmountsIn(
-            info.uints[0],
-            info.path
-        );
-        if (info.isFRE) {
-            IFixedRateExchange fre = IFixedRateExchange(info.meta[0]);
-            //TODO this.getDTIn(fre, info.exchangeId, )
-        } else {
-            IPool pool = IPool(info.meta[0]);
-            (amountIn, , , , ) = pool.getAmountInExactOut(
-                info.meta[1],
-                info.path[info.path.length - 1],
-                amounts[amounts.length - 1],
+                info.path[0],
+                baseAmountOut,
                 ZERO_FEES
             );
         }
     }
 
-    function calcTokenInGivenDTOut(TradeInfo calldata info)
-        public
-        view
-        returns (uint256 amountIn)
-    {
-        uint256 amountOut;
-        if (info.isFRE) {
-            IFixedRateExchange fre = IFixedRateExchange(info.meta[0]);
-            (amountOut, , , ) = fre.calcBaseInGivenOutDT(
-                info.exchangeId,
-                info.uints[2],
-                ZERO_FEES
-            );
-        } else {
-            IPool pool = IPool(info.meta[0]);
-            (amountOut, , , , ) = pool.getAmountInExactOut(
-                info.path[info.path.length - 1],
-                info.meta[1],
-                info.uints[2],
-                ZERO_FEES
-            );
-        }
-
-        IUniV2Adapter adapter = IUniV2Adapter(info.meta[4]);
-        uint256[] memory amountsIn = adapter.getAmountsIn(amountOut, info.path);
-        amountIn = amountsIn[0];
-    }
-
-    function getFREBaseRate(
-        IFixedRateExchange exchange,
-        bytes32 exchangeId,
-        uint256 opcFees
-    )
+    // calculate Token In DT Out
+    function calcTokenInGivenDatatokenOut(TradeInfo calldata info)
         public
         view
         returns (
-            uint256 baseRate,
-            uint256 basefees,
-            uint256 fees
+            uint256 tokenAmountIn,
+            uint256 baseAmountNeeded,
+            uint256 dataxFee,
+            uint256 refFee
         )
     {
-        uint256 rate = exchange.getRate(exchangeId);
-        basefees = opcFees.div(BASE);
-        fees = rate.mul(basefees);
-        baseRate = rate.add(fees);
-    }
-
-    function getDTIn(
-        IFixedRateExchange fre,
-        bytes32 exchangeId,
-        uint256 baseTokenOutAmount
-    ) public view returns (uint256 datatokenAmount) {
-        (
-            uint256 dtDecimals,
-            uint256 btDecimals,
-            uint256 fixedRate
-        ) = getExchangeVars(fre, exchangeId);
-
-        uint256 datatokenAmountBeforeFee = baseTokenOutAmount
-            .mul(BASE)
-            .mul(10**dtDecimals)
-            .div(10**btDecimals)
-            .div(fixedRate);
-
-        Fees memory fee = Fees(0, 0, 0, 0);
-        (uint256 marketFee, , uint256 opcFee, , ) = fre.getFeesInfo(exchangeId);
-        if (opcFee != 0) {
-            fee.oceanFeeAmount = datatokenAmountBeforeFee.mul(opcFee).div(BASE);
-        } else fee.oceanFeeAmount = 0;
-
-        if (marketFee != 0) {
-            fee.publishMarketFeeAmount = datatokenAmountBeforeFee
-                .mul(marketFee)
-                .div(BASE);
+        if (info.isFRE) {
+            baseAmountNeeded = freRouter.calcBaseTokenInGivenDatatokenOut(
+                info.meta[0],
+                info.exchangeId,
+                info.uints[2]
+            );
         } else {
-            fee.publishMarketFeeAmount = 0;
+            IPool pool = IPool(info.meta[0]);
+            (baseAmountNeeded, , , , ) = pool.getAmountInExactOut(
+                info.path[info.path.length - 1],
+                info.meta[1],
+                info.uints[2],
+                ZERO_FEES
+            );
         }
-
-        datatokenAmount = datatokenAmountBeforeFee
-            .add(fee.publishMarketFeeAmount)
-            .add(fee.oceanFeeAmount)
-            .add(fee.consumeMarketFeeAmount);
+        (dataxFee, refFee) = calcFees(
+            baseAmountNeeded,
+            TRADE_FEE_TYPE,
+            info.uints[3]
+        );
+        tokenAmountIn = baseAmountNeeded.add(dataxFee.add(refFee));
+        if (info.path.length > 1) {
+            IAdapter adapter = IAdapter(info.meta[4]);
+            uint256[] memory amountsIn = adapter.getAmountsIn(
+                tokenAmountIn,
+                info.path
+            );
+            tokenAmountIn = amountsIn[0];
+        }
     }
 
-    function getExchangeVars(IFixedRateExchange fre, bytes32 exchangeId)
-        private
-        view
-        returns (
-            uint256 dtDecimals,
-            uint256 btDecimals,
-            uint256 fixedRate
-        )
-    {
-        (, , dtDecimals, , btDecimals, fixedRate, , , , , , ) = fre.getExchange(
-            exchangeId
+    //calculate fees
+    function calcFees(
+        uint256 baseAmount,
+        string memory feeType,
+        uint256 refFeeRate
+    ) public view returns (uint256 dataxFee, uint256 refFee) {
+        uint256 feeRate = store.getFees(feeType);
+        require(
+            refFeeRate <= bsub(BONE, feeRate),
+            "TradeRouter: Ref Fees too high"
         );
+
+        // DataX Fees
+        if (feeRate != 0) {
+            dataxFee = bsub(baseAmount, bmul(baseAmount, bsub(BONE, feeRate)));
+        }
+        // Referral fees
+        if (refFeeRate != 0) {
+            refFee = bsub(baseAmount, bmul(baseAmount, bsub(BONE, refFeeRate)));
+        }
     }
 
     //receive ETH
