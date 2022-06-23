@@ -2,8 +2,8 @@ pragma solidity >=0.8.0 <0.9.0;
 //Copyright of DataX Protocol contributors
 //SPDX-License-Identifier: BSU-1.1
 
-import "../interfaces/IAdapter.sol";
-import "../interfaces/ocean/IPool.sol";
+import "../../interfaces/defi/IAdapter.sol";
+import "../../interfaces/ocean/IPool.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";

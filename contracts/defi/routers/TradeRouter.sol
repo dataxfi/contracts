@@ -2,20 +2,20 @@ pragma solidity >=0.8.0 <0.9.0;
 //Copyright of DataX Protocol contributors
 //SPDX-License-Identifier: BSU-1.1
 
-import "../interfaces/IAdapter.sol";
-import "../interfaces/ITradeRouter.sol";
-import "../interfaces/ocean/IPool.sol";
-import "../interfaces/ocean/IFactoryRouter.sol";
-import "../interfaces/ocean/IFixedRateExchange.sol";
+import "../../interfaces/defi/IAdapter.sol";
+import "../../interfaces/defi/ITradeRouter.sol";
+import "../../interfaces/ocean/IPool.sol";
+import "../../interfaces/ocean/IFactoryRouter.sol";
+import "../../interfaces/ocean/IFixedRateExchange.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../interfaces/IStorage.sol";
+import "../../interfaces/defi/IStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "../utils/Math.sol";
-import "../interfaces/IPoolRouter.sol";
-import "../interfaces/IFRERouter.sol";
+import "../../interfaces/defi/IPoolRouter.sol";
+import "../../interfaces/defi/IFRERouter.sol";
 import "hardhat/console.sol";
 
 contract TradeRouter is ReentrancyGuard, Math {

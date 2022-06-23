@@ -2,7 +2,7 @@ pragma solidity >=0.8.0 <0.9.0;
 // Copyright DataX Protocol contributors
 //SPDX-License-Identifier: BSU-1.1
 
-import "../interfaces/IUniV2Router02.sol";
+import "../../interfaces/defi/IUniV2Router02.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";

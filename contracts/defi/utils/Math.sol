@@ -103,10 +103,6 @@ contract Math is Const {
         uint256 sum = term;
         bool negative = false;
 
-        // term(k) = numer / denom
-        //         = (product(a - i - 1, i=1-->k) * x^k) / (k!)
-        // each iteration, multiply previous term by (a-(k-1)) * x / k
-        // continue until term is less than precision
         for (uint256 i = 1; term >= precision; i++) {
             uint256 bigK = i * BONE;
             (uint256 c, bool cneg) = bsubSign(a, bsub(bigK, BONE));
