@@ -32,16 +32,33 @@ contract TradeRouter is ReentrancyGuard, Math {
 
     event TradedETHToDataToken(
         address indexed tokenOut,
+        address indexed baseToken,
         address from,
         address to,
-        uint256 amountOut
+        uint256 amount
+    );
+    event TradedDataTokenToETH(
+        address indexed tokenIn,
+        address indexed baseToken,
+        address from,
+        address to,
+        uint256 amount
     );
     event TradedTokenToDataToken(
         address indexed tokenOut,
+        address indexed baseToken,
         address indexed tokenIn,
         address from,
         address to,
-        uint256 amountOut
+        uint256 amount
+    );
+    event TradedDataTokenToToken(
+        address indexed tokenIn,
+        address indexed baseToken,
+        address indexed tokenOut,
+        address from,
+        address to,
+        uint256 amount
     );
 
     struct Exchange {
@@ -53,7 +70,7 @@ contract TradeRouter is ReentrancyGuard, Math {
     }
 
     struct TradeInfo {
-        address[5] meta; //[source, dtAddress, to, refAddress, adapterAddress]
+        address[6] meta; //[source, dtAddress, to, refAddress, adapterAddress, baseTokenAddress]
         uint256[4] uints; //[exactAmountIn/maxAmountIn, baseAmountNeeded, exactAmountOut/minAmountOut, refFees]
         address[] path;
         bool isFRE;
@@ -136,9 +153,10 @@ contract TradeRouter is ReentrancyGuard, Math {
 
         emit TradedETHToDataToken(
             info.meta[1],
+            info.path[info.path.length - 1],
             msg.sender,
             info.meta[2],
-            info.uints[2]
+            info.uints[1]
         );
     }
 
@@ -200,9 +218,10 @@ contract TradeRouter is ReentrancyGuard, Math {
 
         emit TradedETHToDataToken(
             info.meta[1],
+            info.path[info.path.length - 1],
             msg.sender,
             info.meta[2],
-            info.uints[2]
+            info.uints[1]
         );
     }
 
@@ -281,10 +300,11 @@ contract TradeRouter is ReentrancyGuard, Math {
 
         emit TradedTokenToDataToken(
             info.meta[1],
+            info.path[info.path.length - 1],
             info.path[0],
             msg.sender,
             info.meta[2],
-            info.uints[2]
+            info.uints[1]
         );
     }
 
@@ -361,10 +381,315 @@ contract TradeRouter is ReentrancyGuard, Math {
 
         emit TradedTokenToDataToken(
             info.meta[1],
+            info.path[info.path.length - 1],
             info.path[0],
             msg.sender,
             info.meta[2],
-            info.uints[2]
+            info.uints[1]
+        );
+    }
+
+    function swapExactDatatokenToETH(TradeInfo calldata info)
+        external
+        nonReentrant
+        returns (
+            uint256 ethAmountOut,
+            uint256 dataxFee,
+            uint256 refFee
+        )
+    {
+        require(
+            info.meta[2] != address(0),
+            "TradeRouter: Destination address not provided"
+        );
+        IERC20 tokenIn = IERC20(info.meta[1]);
+        require(
+            tokenIn.transferFrom(msg.sender, address(this), info.uints[0]),
+            "TradeRouter: Self-transfer TokenIn Failed"
+        );
+        uint256 baseAmountOutSansFee;
+        if (info.isFRE) {
+            IERC20(info.meta[1]).approve(address(freRouter), info.uints[0]);
+            baseAmountOutSansFee = freRouter.swapExactDatatokenToBaseToken(
+                info.path[0],
+                info.meta[1],
+                address(this),
+                info.meta[0],
+                info.exchangeId,
+                info.uints[0],
+                info.uints[1]
+            );
+        } else {
+            IERC20(info.meta[1]).approve(address(poolRouter), info.uints[0]);
+            baseAmountOutSansFee = poolRouter.swapExactDatatokenToBaseToken(
+                info.path[0],
+                info.meta[1],
+                address(this),
+                info.meta[0],
+                info.uints[0],
+                info.uints[1]
+            );
+        }
+
+        (dataxFee, refFee) = calcFees(
+            baseAmountOutSansFee,
+            TRADE_FEE_TYPE,
+            info.uints[3]
+        );
+
+        uint256 baseAmountIn = baseAmountOutSansFee.sub(dataxFee.add(refFee));
+        if (info.meta[2] != address(0)) {
+            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+        }
+
+        IAdapter adapter = IAdapter(info.meta[4]);
+        IERC20(info.path[0]).approve(info.meta[4], baseAmountIn);
+        ethAmountOut = adapter.swapExactTokensForETH(
+            baseAmountIn,
+            info.uints[2],
+            info.path,
+            info.meta[2]
+        );
+
+        emit TradedDataTokenToETH(
+            info.meta[1],
+            info.path[0],
+            msg.sender,
+            info.meta[2],
+            info.uints[1]
+        );
+    }
+
+    function swapDatatokenToExactETH(TradeInfo calldata info)
+        external
+        nonReentrant
+        returns (
+            uint256 tokenAmountIn,
+            uint256 dataxFee,
+            uint256 refFee
+        )
+    {
+        require(
+            info.meta[2] != address(0),
+            "TradeRouter: Destination address not provided"
+        );
+        IERC20 tokenIn = IERC20(info.meta[1]);
+        require(
+            tokenIn.transferFrom(msg.sender, address(this), info.uints[0]),
+            "TradeRouter: Self-transfer TokenIn Failed"
+        );
+
+        (dataxFee, refFee) = calcFees(
+            info.uints[1],
+            TRADE_FEE_TYPE,
+            info.uints[3]
+        );
+
+        uint256 baseAmountOutSansFee = info.uints[1].add(dataxFee.add(refFee));
+
+        if (info.isFRE) {
+            IERC20(info.meta[1]).approve(address(freRouter), info.uints[0]);
+            baseAmountOutSansFee = freRouter.swapExactDatatokenToBaseToken(
+                info.path[0],
+                info.meta[1],
+                address(this),
+                info.meta[0],
+                info.exchangeId,
+                info.uints[0],
+                baseAmountOutSansFee
+            );
+        } else {
+            IERC20(info.meta[1]).approve(address(poolRouter), info.uints[0]);
+            poolRouter.swapDatatokenToExactBaseToken(
+                info.path[0],
+                info.meta[1],
+                address(this),
+                info.meta[0],
+                info.uints[0],
+                baseAmountOutSansFee
+            );
+        }
+        console.log("TR : baseAmountNeeded - ", info.uints[1]);
+        console.log("TR : baseAmountOutSansFee - ", baseAmountOutSansFee);
+
+        console.log("TR : baseAmountIn - ", info.uints[1]);
+        if (info.meta[2] != address(0)) {
+            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+        }
+
+        IAdapter adapter = IAdapter(info.meta[4]);
+        IERC20(info.path[0]).approve(info.meta[4], info.uints[1]);
+        (tokenAmountIn, ) = adapter.swapTokensForExactETH(
+            info.uints[2],
+            info.uints[1],
+            info.path,
+            info.meta[2],
+            info.meta[2]
+        );
+
+        emit TradedDataTokenToETH(
+            info.meta[1],
+            info.path[0],
+            msg.sender,
+            info.meta[2],
+            info.uints[1]
+        );
+    }
+
+    function swapExactDatatokenToToken(TradeInfo calldata info)
+        external
+        nonReentrant
+        returns (
+            uint256 tokenAmountOut,
+            uint256 dataxFee,
+            uint256 refFee
+        )
+    {
+        require(
+            info.meta[2] != address(0),
+            "TradeRouter: Destination address not provided"
+        );
+        IERC20 tokenIn = IERC20(info.meta[1]);
+        require(
+            tokenIn.transferFrom(msg.sender, address(this), info.uints[0]),
+            "TradeRouter: Self-transfer TokenIn Failed"
+        );
+        uint256 baseAmountOutSansFee;
+        if (info.isFRE) {
+            IERC20(info.meta[1]).approve(address(freRouter), info.uints[0]);
+            baseAmountOutSansFee = freRouter.swapExactDatatokenToBaseToken(
+                info.path[0],
+                info.meta[1],
+                address(this),
+                info.meta[0],
+                info.exchangeId,
+                info.uints[0],
+                info.uints[1]
+            );
+        } else {
+            IERC20(info.meta[1]).approve(address(poolRouter), info.uints[0]);
+            baseAmountOutSansFee = poolRouter.swapExactDatatokenToBaseToken(
+                info.path[0],
+                info.meta[1],
+                address(this),
+                info.meta[0],
+                info.uints[0],
+                info.uints[1]
+            );
+        }
+
+        (dataxFee, refFee) = calcFees(
+            baseAmountOutSansFee,
+            TRADE_FEE_TYPE,
+            info.uints[3]
+        );
+
+        tokenAmountOut = baseAmountOutSansFee.sub(dataxFee.add(refFee));
+        if (info.meta[2] != address(0)) {
+            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+        }
+
+        if (info.path.length > 1) {
+            IAdapter adapter = IAdapter(info.meta[4]);
+            IERC20(info.path[0]).approve(info.meta[4], tokenAmountOut);
+            tokenAmountOut = adapter.swapExactTokensForTokens(
+                tokenAmountOut,
+                info.uints[2],
+                info.path,
+                info.meta[2]
+            );
+        } else {
+            IERC20(info.path[0]).transfer(info.meta[2], tokenAmountOut);
+        }
+
+        emit TradedDataTokenToToken(
+            info.meta[1],
+            info.path[info.path.length - 1],
+            info.path[0],
+            msg.sender,
+            info.meta[2],
+            info.uints[1]
+        );
+    }
+
+    function swapDatatokenToExactToken(TradeInfo calldata info)
+        external
+        nonReentrant
+        returns (
+            uint256 tokenAmountIn,
+            uint256 dataxFee,
+            uint256 refFee
+        )
+    {
+        require(
+            info.meta[2] != address(0),
+            "TradeRouter: Destination address not provided"
+        );
+        IERC20 tokenIn = IERC20(info.meta[1]);
+        require(
+            tokenIn.transferFrom(msg.sender, address(this), info.uints[0]),
+            "TradeRouter: Self-transfer TokenIn Failed"
+        );
+
+        (dataxFee, refFee) = calcFees(
+            info.uints[1],
+            TRADE_FEE_TYPE,
+            info.uints[3]
+        );
+
+        uint256 baseAmountOutSansFee = info.uints[1].add(dataxFee.add(refFee));
+
+        if (info.isFRE) {
+            IERC20(info.meta[1]).approve(address(freRouter), info.uints[0]);
+            baseAmountOutSansFee = freRouter.swapExactDatatokenToBaseToken(
+                info.path[0],
+                info.meta[1],
+                address(this),
+                info.meta[0],
+                info.exchangeId,
+                info.uints[0],
+                baseAmountOutSansFee
+            );
+        } else {
+            IERC20(info.meta[1]).approve(address(poolRouter), info.uints[0]);
+            (tokenAmountIn, ) = poolRouter.swapDatatokenToExactBaseToken(
+                info.path[0],
+                info.meta[1],
+                address(this),
+                info.meta[0],
+                info.uints[0],
+                baseAmountOutSansFee
+            );
+        }
+        console.log("TR : baseAmountNeeded - ", info.uints[1]);
+        console.log("TR : baseAmountOutSansFee - ", baseAmountOutSansFee);
+
+        console.log("TR : baseAmountIn - ", info.uints[1]);
+        if (info.meta[2] != address(0)) {
+            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+        }
+
+        if (info.path.length > 1) {
+            IAdapter adapter = IAdapter(info.meta[4]);
+            IERC20(info.path[0]).approve(info.meta[4], info.uints[1]);
+            adapter.swapTokensForExactTokens(
+                info.uints[2],
+                info.uints[1],
+                info.path,
+                info.meta[2],
+                info.meta[2]
+            );
+        } else {
+            IERC20(info.path[0]).transfer(info.meta[2], info.uints[1]);
+        }
+
+        emit TradedDataTokenToToken(
+            info.meta[1],
+            info.path[info.path.length - 1],
+            info.path[0],
+            msg.sender,
+            info.meta[2],
+            info.uints[1]
         );
     }
 
@@ -407,7 +732,7 @@ contract TradeRouter is ReentrancyGuard, Math {
         } else {
             IPool pool = IPool(info.meta[0]);
             (dtAmountOut, , , , ) = pool.getAmountOutExactIn(
-                info.path[info.path.length - 1],
+                info.meta[5],
                 info.meta[1],
                 baseAmountIn,
                 ZERO_FEES
@@ -435,13 +760,14 @@ contract TradeRouter is ReentrancyGuard, Math {
             );
         } else {
             IPool pool = IPool(info.meta[0]);
-            (baseAmountNeeded, , , , ) = pool.getAmountInExactOut(
+            (baseAmountNeeded, , , , ) = pool.getAmountOutExactIn(
                 info.meta[1],
-                info.path[info.path.length - 1],
+                info.meta[5],
                 info.uints[0],
                 ZERO_FEES
             );
         }
+
         //calc Fee
         (dataxFee, refFee) = calcFees(
             baseAmountNeeded,
@@ -453,11 +779,11 @@ contract TradeRouter is ReentrancyGuard, Math {
         if (info.path.length > 1) {
             // calc BT -> Token
             IAdapter adapter = IAdapter(info.meta[4]);
-            uint256[] memory amountsIn = adapter.getAmountsIn(
+            uint256[] memory amounts = adapter.getAmountsOut(
                 tokenAmountOut,
                 info.path
             );
-            tokenAmountOut = amountsIn[0];
+            tokenAmountOut = amounts[amounts.length - 1];
         }
     }
 
@@ -472,12 +798,16 @@ contract TradeRouter is ReentrancyGuard, Math {
             uint256 refFee
         )
     {
-        IAdapter adapter = IAdapter(info.meta[4]);
-        uint256[] memory amounts = adapter.getAmountsIn(
-            info.uints[2],
-            info.path
-        );
-        baseAmountNeeded = amounts[0];
+        baseAmountNeeded = info.uints[2];
+        if (info.path.length > 1) {
+            IAdapter adapter = IAdapter(info.meta[4]);
+            uint256[] memory amounts = adapter.getAmountsIn(
+                info.uints[2],
+                info.path
+            );
+            baseAmountNeeded = amounts[0];
+        }
+
         (dataxFee, refFee) = calcFees(
             baseAmountNeeded,
             TRADE_FEE_TYPE,
@@ -494,7 +824,7 @@ contract TradeRouter is ReentrancyGuard, Math {
             IPool pool = IPool(info.meta[0]);
             (dtAmountIn, , , , ) = pool.getAmountInExactOut(
                 info.meta[1],
-                info.path[0],
+                info.meta[5],
                 baseAmountOut,
                 ZERO_FEES
             );
@@ -521,7 +851,7 @@ contract TradeRouter is ReentrancyGuard, Math {
         } else {
             IPool pool = IPool(info.meta[0]);
             (baseAmountNeeded, , , , ) = pool.getAmountInExactOut(
-                info.path[info.path.length - 1],
+                info.meta[5],
                 info.meta[1],
                 info.uints[2],
                 ZERO_FEES

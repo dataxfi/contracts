@@ -14,7 +14,7 @@ contract StakeRouter is ReentrancyGuard, Math {
     using SafeMath for uint256;
     IStorage store;
     uint8 public version;
-    mapping(address => uint256) public referralFees;
+    mapping(address => mapping(address => uint256)) public referralFees;
     string constant STAKE_FEE_TYPE = "STAKE";
     string constant UNSTAKE_FEE_TYPE = "UNSTAKE";
 
@@ -103,7 +103,9 @@ contract StakeRouter is ReentrancyGuard, Math {
         );
         //collect ref Fees
         if (info.meta[2] != address(0)) {
-            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+            referralFees[info.meta[2]][address(baseToken)] = referralFees[
+                info.meta[2]
+            ][address(baseToken)].add(refFee);
         }
 
         // actual base amount minus fees
@@ -156,6 +158,7 @@ contract StakeRouter is ReentrancyGuard, Math {
 
         require(info.path.length > 1, "StakeRouter: Path too short");
 
+        IERC20 baseToken = IERC20(info.path[0]);
         //unstake into baseToken
         IPool pool = IPool(info.meta[0]);
         IERC20(info.meta[0]).transferFrom(
@@ -179,7 +182,9 @@ contract StakeRouter is ReentrancyGuard, Math {
         );
         //collect ref Fees
         if (info.meta[2] != address(0)) {
-            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+            referralFees[info.meta[2]][address(baseToken)] = referralFees[
+                info.meta[2]
+            ][address(baseToken)].add(refFee);
         }
         // actual base amount minus fees
         uint256 baseAmountOut = bsub(
@@ -187,7 +192,6 @@ contract StakeRouter is ReentrancyGuard, Math {
             badd(dataxFee, refFee)
         );
 
-        IERC20 baseToken = IERC20(info.path[0]);
         baseToken.approve(info.meta[3], baseAmountOut);
 
         //swap to output token
@@ -267,7 +271,9 @@ contract StakeRouter is ReentrancyGuard, Math {
         );
         //collect ref Fees
         if (info.meta[2] != address(0)) {
-            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+            referralFees[info.meta[2]][address(baseToken)] = referralFees[
+                info.meta[2]
+            ][address(baseToken)].add(refFee);
         }
         // actual base amount minus fees
         uint256 baseAmountOut = bsub(
@@ -336,6 +342,8 @@ contract StakeRouter is ReentrancyGuard, Math {
             info.uints[0]
         );
 
+        IERC20 baseToken = IERC20(info.path[0]);
+
         //deduct fees
         (uint256 dataxFee, uint256 refFee) = calcFees(
             baseAmountOutSansFee,
@@ -344,14 +352,15 @@ contract StakeRouter is ReentrancyGuard, Math {
         );
         //collect ref Fees
         if (info.meta[2] != address(0)) {
-            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+            referralFees[info.meta[2]][address(baseToken)] = referralFees[
+                info.meta[2]
+            ][address(baseToken)].add(refFee);
         }
         // actual base amount minus fees
         uint256 baseAmountOut = bsub(
             baseAmountOutSansFee,
             badd(dataxFee, refFee)
         );
-        IERC20 baseToken = IERC20(info.path[0]);
 
         //skip if tokenOut is the baseToken
         if (info.path.length > 1) {
@@ -505,23 +514,23 @@ contract StakeRouter is ReentrancyGuard, Math {
     }
 
     //claim collected Referral fees
-    function claimRefFees(address token)
+    function claimRefFees(address token, address referrer)
         external
         nonReentrant
         returns (uint256 claimAmount)
     {
         IERC20 baseToken = IERC20(token);
-        claimAmount = referralFees[msg.sender];
+        claimAmount = referralFees[referrer][token];
         require(claimAmount > 0, "StakeRouter: No tokens to claim");
         //reset claimable amount
-        referralFees[msg.sender] = 0;
+        referralFees[referrer][token] = 0;
         //transfer tokens to referrer
         require(
-            baseToken.transfer(msg.sender, claimAmount),
+            baseToken.transfer(referrer, claimAmount),
             "StakeRouter: Referral Token claim failed"
         );
 
-        emit ReferralFeesClaimed(msg.sender, token, claimAmount);
+        emit ReferralFeesClaimed(referrer, token, claimAmount);
     }
 
     //receive ETH

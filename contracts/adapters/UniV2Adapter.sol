@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "hardhat/console.sol";
 
 contract UniV2Adapter {
     IUniswapV2Router02 uniswapRouter;
@@ -95,7 +96,7 @@ contract UniV2Adapter {
         external
         payable
         hasAllowance(path[0], amountInMax)
-        returns (uint256 amtOut)
+        returns (uint256 tokenAmountIn, uint256 refund)
     {
         //approve Uni router to spend
         require(
@@ -110,7 +111,6 @@ contract UniV2Adapter {
             IERC20(path[0]).approve(address(uniswapRouter), amountInMax),
             "UniV2Adapter: Failed to approve UniV2Router"
         );
-
         //swap tokens to exact ETH
         uint256[] memory amounts = uniswapRouter.swapTokensForExactETH(
             amountOut,
@@ -120,11 +120,12 @@ contract UniV2Adapter {
             block.timestamp + DEADLINE
         );
 
-        amtOut = amounts[amounts.length - 1];
+        tokenAmountIn = amounts[0];
+        refund = amountInMax.sub(amounts[0]);
 
         //refund remaining tokens
         require(
-            IERC20(path[0]).transfer(refundTo, amountInMax.sub(amounts[0])),
+            IERC20(path[0]).transfer(refundTo, refund),
             "UniV2Adapter: Token refund failed"
         );
     }

@@ -11,19 +11,20 @@ let owner, trader, beneficiary, referrer;
 let storage;
 let tradeRouter, poolRouter, freRouter, adapter;
 let oceanToken;
-let pool;
-let poolDT;
+let fre;
+let freDT;
 const UNIV2ROUTER_ADDRESS = config[chainId].UNI_V2_ROUTER_ADDRESS;
-const POOL_ADDRESS = config[chainId].POOL_ADDRESS;
+const FRE_ADDRESS = config[chainId].FRE_ADDRESS;
 const POOL2_ADDRESS = config[chainId].POOL2_ADDRESS;
 const OCEAN_ADDRESS = config[chainId].OCEAN_ADDRESS;
 const WETH_ADDRESS = config[chainId].WETH_ADDRESS;
 const USDT_ADDRESS = config[chainId].USDT_ADDRESS;
-const POOL_DT_ADDRESS = config[chainId].POOL_DT_ADDRESS;
+const FRE_DT_ADDRESS = config[chainId].FRE_DT_ADDRESS;
 const VERSION = 1;
 const TRADER_ADDRESS = config[chainId].USER_ADDRESS;
 const REF_FEES = "10000000000000000";
 const PROVIDER = config[chainId].PROVIDER;
+const FRE_ID = config[chainId].FRE_ID;
 
 const impersonateAddress = async (address) => {
   await network.provider.request({
@@ -35,7 +36,7 @@ const impersonateAddress = async (address) => {
   return signer;
 };
 
-describe("Test Trade Router contract for Data Pools", function () {
+describe("Test Trade Router contract for Data FREs", function () {
 
   before("Prepare test environment", async function () {
     console.log("Chain ID - ", process.env.chainId);
@@ -70,8 +71,8 @@ describe("Test Trade Router contract for Data Pools", function () {
     oceanToken = await ethers.getContractAt("IERC20V1", OCEAN_ADDRESS);
     usdtToken = await ethers.getContractAt("IERC20V1", USDT_ADDRESS);
     trader = await impersonateAddress(TRADER_ADDRESS);
-    pool = await ethers.getContractAt("IERC20V1", POOL_ADDRESS);
-    poolDT = await ethers.getContractAt("IERC20V1", POOL_DT_ADDRESS);
+    fre = await ethers.getContractAt("IERC20V1", FRE_ADDRESS);
+    freDT = await ethers.getContractAt("IERC20V1", FRE_DT_ADDRESS);
 
   });
 
@@ -84,7 +85,7 @@ describe("Test Trade Router contract for Data Pools", function () {
 
     let baseAmountNeeded = 0, dtAmountOut = 0;
 
-    let preCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[amountToTrade, baseAmountNeeded, dtAmountOut, REF_FEES],[WETH_ADDRESS, OCEAN_ADDRESS], false, ethers.utils.formatBytes32String("0")];
+    let preCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[amountToTrade, baseAmountNeeded, dtAmountOut, REF_FEES],[WETH_ADDRESS, OCEAN_ADDRESS], true, FRE_ID];
     let result = await tradeRouter.calcDatatokenOutGivenTokenIn(preCalcInfo);
     //console.log(result);;
     dtAmountOut = result.dtAmountOut.toString();
@@ -97,13 +98,13 @@ describe("Test Trade Router contract for Data Pools", function () {
     console.log("Ref Fee - ", refFee);
 
     console.log("Trader Address - ", trader.address);
-    let dtBalPreTrade = (await poolDT.balanceOf(trader.address)).toString();
+    let dtBalPreTrade = (await freDT.balanceOf(trader.address)).toString();
     console.log("DT balance post-trade - ", dtBalPreTrade.toString());
-    let postCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[amountToTrade, baseAmountNeeded, dtAmountOut, REF_FEES],[WETH_ADDRESS, OCEAN_ADDRESS], false, ethers.utils.formatBytes32String("0")];
+    let postCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[amountToTrade, baseAmountNeeded, dtAmountOut, REF_FEES],[WETH_ADDRESS, OCEAN_ADDRESS], true, FRE_ID];
     let tradeRes = await tradeRouter.connect(trader).swapExactETHToDatatoken(postCalcInfo, {value: amountToTrade});
     //console.log(tradeRes);
   
-    let dtBalPostTrade = (await poolDT.balanceOf(trader.address)).toString();
+    let dtBalPostTrade = (await freDT.balanceOf(trader.address)).toString();
     console.log("DT balance post-trade - ", dtBalPostTrade.toString());
     expect(dtBalPostTrade).to.equal(dtAmountOut);
 
@@ -112,15 +113,15 @@ describe("Test Trade Router contract for Data Pools", function () {
   
 
   it("2) Swap ETH -> exact DT", async () => {
-    let amountToTrade = ethers.utils.parseEther('1');
+    let amountToTrade = ethers.utils.parseEther('0.01');
     console.log("Adapter address - ", adapter.address);
 
-    console.log("Pool address - ", POOL_ADDRESS);
+    console.log("FRE address - ", FRE_ADDRESS);
 
     let baseAmountNeeded = 0, dtAmountOut = 0;
 
-    let preCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[amountToTrade, baseAmountNeeded, dtAmountOut, REF_FEES],[WETH_ADDRESS, OCEAN_ADDRESS], false, ethers.utils.formatBytes32String("0")];
-    let result = await tradeRouter.calcTokenInGivenDatatokenOut(preCalcInfo);
+    let preCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[amountToTrade, baseAmountNeeded, dtAmountOut, REF_FEES],[WETH_ADDRESS, OCEAN_ADDRESS], true, FRE_ID];
+    let result = await tradeRouter.calcTokenOutGivenDatatokenIn(preCalcInfo);
     //console.log(result);;
     dtAmountOut = result.tokenAmountOut.toString();
     console.log("DT Amount Out - ", dtAmountOut);
@@ -132,13 +133,13 @@ describe("Test Trade Router contract for Data Pools", function () {
     console.log("Ref Fee - ", refFee);
 
     console.log("Trader Address - ", trader.address);
-    let dtBalPreTrade = (await poolDT.balanceOf(trader.address));
+    let dtBalPreTrade = (await freDT.balanceOf(trader.address));
     console.log("DT balance pre-trade - ", dtBalPreTrade.toString());
-    let postCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[amountToTrade, baseAmountNeeded, dtAmountOut, REF_FEES],[WETH_ADDRESS, OCEAN_ADDRESS], false, ethers.utils.formatBytes32String("0")];
+    let postCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[amountToTrade, baseAmountNeeded, dtAmountOut, REF_FEES],[WETH_ADDRESS, OCEAN_ADDRESS], true, FRE_ID];
     let tradeRes = await tradeRouter.connect(trader).swapETHToExactDatatoken(postCalcInfo, {value: amountToTrade});
     //console.log(tradeRes);
   
-    let dtBalPostTrade = (await poolDT.balanceOf(trader.address));
+    let dtBalPostTrade = (await freDT.balanceOf(trader.address));
     console.log("DT balance post-trade - ", dtBalPostTrade.toString());
     expect((dtBalPostTrade.sub(dtBalPreTrade)).toString()).to.equal(dtAmountOut);
 
@@ -151,7 +152,7 @@ describe("Test Trade Router contract for Data Pools", function () {
 
     let baseAmountNeeded = 0, dtAmountOut = 0;
 
-    let preCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[amountToTrade, baseAmountNeeded, dtAmountOut, REF_FEES],[OCEAN_ADDRESS], false, ethers.utils.formatBytes32String("0")];
+    let preCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[amountToTrade, baseAmountNeeded, dtAmountOut, REF_FEES],[OCEAN_ADDRESS], true, FRE_ID];
     let result = await tradeRouter.calcDatatokenOutGivenTokenIn(preCalcInfo);
     //console.log(result);;
     dtAmountOut = result.dtAmountOut.toString();
@@ -164,9 +165,9 @@ describe("Test Trade Router contract for Data Pools", function () {
     console.log("Ref Fee - ", refFee);
 
     console.log("Trader Address - ", trader.address);
-    let dtBalPreTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPreTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance pre-trade - ", dtBalPreTrade.toString());
-    let postCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[amountToTrade, baseAmountNeeded, dtAmountOut, REF_FEES],[OCEAN_ADDRESS], false, ethers.utils.formatBytes32String("0")];
+    let postCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[amountToTrade, baseAmountNeeded, dtAmountOut, REF_FEES],[OCEAN_ADDRESS], true, FRE_ID];
     await oceanToken.connect(trader).approve(tradeRouter.address, baseAmountNeeded);
     let allowance  = await oceanToken.allowance(trader.address, tradeRouter.address);
     console.log("Ocean token address - ", oceanToken.address);
@@ -175,7 +176,7 @@ describe("Test Trade Router contract for Data Pools", function () {
     
     //console.log(tradeRes);
   
-    let dtBalPostTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPostTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance post-trade - ", dtBalPostTrade.toString());
     expect((dtBalPostTrade.sub(dtBalPreTrade)).toString()).to.equal(dtAmountOut);
 
@@ -188,7 +189,7 @@ describe("Test Trade Router contract for Data Pools", function () {
     dtAmountOut = ethers.utils.parseEther('10'),
     tokenAmountIn = 0;
 
-    let preCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[tokenAmountIn, baseAmountNeeded, dtAmountOut, REF_FEES],[OCEAN_ADDRESS], false, ethers.utils.formatBytes32String("0")];
+    let preCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[tokenAmountIn, baseAmountNeeded, dtAmountOut, REF_FEES],[OCEAN_ADDRESS], true, FRE_ID];
     let result = await tradeRouter.calcTokenInGivenDatatokenOut(preCalcInfo);
     //console.log(result);
     tokenAmountIn = result.tokenAmountIn;
@@ -202,16 +203,16 @@ describe("Test Trade Router contract for Data Pools", function () {
     console.log("Ref Fee - ", refFee.toString());
 
     console.log("Trader Address - ", trader.address);
-    let dtBalPreTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPreTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance pre-trade - ", dtBalPreTrade.toString());
-    let postCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[tokenAmountIn, baseAmountNeeded, dtAmountOut, REF_FEES],[OCEAN_ADDRESS], false, ethers.utils.formatBytes32String("0")];
+    let postCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[tokenAmountIn, baseAmountNeeded, dtAmountOut, REF_FEES],[OCEAN_ADDRESS], true, FRE_ID];
     await oceanToken.connect(trader).approve(tradeRouter.address, postCalcInfo[1][0]);
     let allowance  = await oceanToken.allowance(trader.address, tradeRouter.address);
     console.log("Trade Router allowance - ", allowance.toString());
     let tradeRes = await tradeRouter.connect(trader).swapTokenToExactDatatoken(postCalcInfo);
     //console.log(tradeRes);
   
-    let dtBalPostTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPostTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance post-trade - ", dtBalPostTrade.toString());
     expect((dtBalPostTrade.sub(dtBalPreTrade)).toString()).to.equal(dtAmountOut);
   });
@@ -224,7 +225,7 @@ describe("Test Trade Router contract for Data Pools", function () {
 
     let baseAmountNeeded = 0, dtAmountOut = 0;
 
-    let preCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[amountToTrade, baseAmountNeeded, dtAmountOut, REF_FEES],[USDT_ADDRESS,WETH_ADDRESS,OCEAN_ADDRESS], false, ethers.utils.formatBytes32String("0")];
+    let preCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[amountToTrade, baseAmountNeeded, dtAmountOut, REF_FEES],[USDT_ADDRESS,WETH_ADDRESS,OCEAN_ADDRESS], true, FRE_ID];
     let result = await tradeRouter.calcDatatokenOutGivenTokenIn(preCalcInfo);
     //console.log(result);;
     dtAmountOut = result.dtAmountOut;
@@ -237,9 +238,9 @@ describe("Test Trade Router contract for Data Pools", function () {
     console.log("Ref Fee - ", refFee);
 
     console.log("Trader Address - ", trader.address);
-    let dtBalPreTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPreTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance pre-trade - ", dtBalPreTrade.toString());
-    let postCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[amountToTrade, baseAmountNeeded, dtAmountOut, REF_FEES],[USDT_ADDRESS,WETH_ADDRESS,OCEAN_ADDRESS], false, ethers.utils.formatBytes32String("0")];
+    let postCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[amountToTrade, baseAmountNeeded, dtAmountOut, REF_FEES],[USDT_ADDRESS,WETH_ADDRESS,OCEAN_ADDRESS], true, FRE_ID];
     await usdtToken.connect(trader).approve(tradeRouter.address, amountToTrade);
     let allowance  = await usdtToken.allowance(trader.address, tradeRouter.address);
     console.log("Trade Router allowance - ", allowance.toString());
@@ -247,7 +248,7 @@ describe("Test Trade Router contract for Data Pools", function () {
     
     //console.log(tradeRes);
   
-    let dtBalPostTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPostTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance post-trade - ", dtBalPostTrade.toString());
     expect((dtBalPostTrade.sub(dtBalPreTrade)).toString()).to.equal(dtAmountOut);
 
@@ -259,7 +260,7 @@ describe("Test Trade Router contract for Data Pools", function () {
     dtAmountOut = ethers.utils.parseEther('10'),
     tokenAmountIn = 0;
 
-    let preCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[tokenAmountIn, baseAmountNeeded, dtAmountOut, REF_FEES],[USDT_ADDRESS,WETH_ADDRESS,OCEAN_ADDRESS], false, ethers.utils.formatBytes32String("0")];
+    let preCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[tokenAmountIn, baseAmountNeeded, dtAmountOut, REF_FEES],[USDT_ADDRESS,WETH_ADDRESS,OCEAN_ADDRESS], true, FRE_ID];
     let result = await tradeRouter.calcTokenInGivenDatatokenOut(preCalcInfo);
     //console.log(result);
     tokenAmountIn = result.tokenAmountIn;
@@ -273,16 +274,16 @@ describe("Test Trade Router contract for Data Pools", function () {
     console.log("Ref Fee - ", refFee.toString());
 
     console.log("Trader Address - ", trader.address);
-    let dtBalPreTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPreTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance pre-trade - ", dtBalPreTrade.toString());
-    let postCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[tokenAmountIn, baseAmountNeeded, dtAmountOut, REF_FEES],[USDT_ADDRESS,WETH_ADDRESS,OCEAN_ADDRESS], false, ethers.utils.formatBytes32String("0")];
+    let postCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[tokenAmountIn, baseAmountNeeded, dtAmountOut, REF_FEES],[USDT_ADDRESS,WETH_ADDRESS,OCEAN_ADDRESS], true, FRE_ID];
     await usdtToken.connect(trader).approve(tradeRouter.address, postCalcInfo[1][0]);
     let allowance  = await usdtToken.allowance(trader.address, tradeRouter.address);
     console.log("Trade Router allowance - ", allowance.toString());
     let tradeRes = await tradeRouter.connect(trader).swapTokenToExactDatatoken(postCalcInfo);
     //console.log(tradeRes);
   
-    let dtBalPostTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPostTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance post-trade - ", dtBalPostTrade.toString());
     expect((dtBalPostTrade.sub(dtBalPreTrade)).toString()).to.equal(dtAmountOut);
   });
@@ -297,7 +298,7 @@ describe("Test Trade Router contract for Data Pools", function () {
     dtAmountIn = 0,
     tokenAmountOut = ethers.utils.parseUnits('1','mwei');
 
-    let preCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, tokenAmountOut, REF_FEES],[OCEAN_ADDRESS,WETH_ADDRESS,USDT_ADDRESS], false, ethers.utils.formatBytes32String("0")];
+    let preCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, tokenAmountOut, REF_FEES],[OCEAN_ADDRESS,WETH_ADDRESS,USDT_ADDRESS], true, FRE_ID];
     let result = await tradeRouter.calcDatatokenInGivenTokenOut(preCalcInfo);
     //console.log(result);
     dtAmountIn = result.dtAmountIn;
@@ -311,20 +312,20 @@ describe("Test Trade Router contract for Data Pools", function () {
     console.log("Ref Fee - ", refFee.toString());
 
     console.log("Trader Address - ", trader.address);
-    let dtBalPreTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPreTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance pre-trade - ", dtBalPreTrade.toString());
     let usdtBalPreTrade = await usdtToken.balanceOf(trader.address);
     console.log("USDT balance pre-trade - ", usdtBalPreTrade.toString());
-    let postCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, tokenAmountOut, REF_FEES],[OCEAN_ADDRESS,WETH_ADDRESS,USDT_ADDRESS], false, ethers.utils.formatBytes32String("0")];
-    await poolDT.connect(trader).approve(tradeRouter.address, dtAmountIn);
-    let allowance  = await poolDT.allowance(trader.address, tradeRouter.address);
+    let postCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, tokenAmountOut, REF_FEES],[OCEAN_ADDRESS,WETH_ADDRESS,USDT_ADDRESS], true, FRE_ID];
+    await freDT.connect(trader).approve(tradeRouter.address, dtAmountIn);
+    let allowance  = await freDT.allowance(trader.address, tradeRouter.address);
     console.log("Trade Router allowance - ", allowance.toString());
     let tradeRes = await tradeRouter.connect(trader).swapDatatokenToExactToken(postCalcInfo);
     //console.log(tradeRes);
   
     let usdtBalPostTrade = await usdtToken.balanceOf(trader.address);
     console.log("USDT balance post-trade - ", usdtBalPostTrade.toString());
-    let dtBalPostTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPostTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance post-trade - ", dtBalPostTrade.toString());
     expect((dtBalPreTrade.sub(dtBalPostTrade))).to.gte(dtAmountIn);
     expect((usdtBalPostTrade.sub(usdtBalPreTrade))).to.eq(tokenAmountOut);
@@ -336,7 +337,7 @@ describe("Test Trade Router contract for Data Pools", function () {
     dtAmountIn = ethers.utils.parseEther('1'),
     tokenAmountOut = 0;
 
-    let preCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, tokenAmountOut, REF_FEES],[OCEAN_ADDRESS,WETH_ADDRESS,USDT_ADDRESS], false, ethers.utils.formatBytes32String("0")];
+    let preCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, tokenAmountOut, REF_FEES],[OCEAN_ADDRESS,WETH_ADDRESS,USDT_ADDRESS], true, FRE_ID];
     let result = await tradeRouter.calcTokenOutGivenDatatokenIn(preCalcInfo);
     //console.log(result);
     tokenAmountOut = result.tokenAmountOut;
@@ -350,20 +351,20 @@ describe("Test Trade Router contract for Data Pools", function () {
     console.log("Ref Fee - ", refFee.toString());
 
     console.log("Trader Address - ", trader.address);
-    let dtBalPreTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPreTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance pre-trade - ", dtBalPreTrade.toString());
     let usdtBalPreTrade = await usdtToken.balanceOf(trader.address);
     console.log("USDT balance pre-trade - ", usdtBalPreTrade.toString());
-    let postCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, tokenAmountOut, REF_FEES],[OCEAN_ADDRESS,WETH_ADDRESS,USDT_ADDRESS], false, ethers.utils.formatBytes32String("0")];
-    await poolDT.connect(trader).approve(tradeRouter.address, dtAmountIn);
-    let allowance  = await poolDT.allowance(trader.address, tradeRouter.address);
+    let postCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, tokenAmountOut, REF_FEES],[OCEAN_ADDRESS,WETH_ADDRESS,USDT_ADDRESS], true, FRE_ID];
+    await freDT.connect(trader).approve(tradeRouter.address, dtAmountIn);
+    let allowance  = await freDT.allowance(trader.address, tradeRouter.address);
     console.log("Trade Router allowance - ", allowance.toString());
     let tradeRes = await tradeRouter.connect(trader).swapExactDatatokenToToken(postCalcInfo);
     //console.log(tradeRes);
   
     let usdtBalPostTrade = await usdtToken.balanceOf(trader.address);
     console.log("USDT balance post-trade - ", usdtBalPostTrade.toString());
-    let dtBalPostTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPostTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance post-trade - ", dtBalPostTrade.toString());
     expect((dtBalPreTrade.sub(dtBalPostTrade))).to.gte(dtAmountIn);
     expect((usdtBalPostTrade.sub(usdtBalPreTrade))).to.eq(tokenAmountOut);
@@ -374,7 +375,7 @@ describe("Test Trade Router contract for Data Pools", function () {
     dtAmountIn = ethers.utils.parseEther('1'),
     tokenAmountOut = 0;
 
-    let preCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, tokenAmountOut, REF_FEES],[OCEAN_ADDRESS], false, ethers.utils.formatBytes32String("0")];
+    let preCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, tokenAmountOut, REF_FEES],[OCEAN_ADDRESS], true, FRE_ID];
     let result = await tradeRouter.calcTokenOutGivenDatatokenIn(preCalcInfo);
     //console.log(result);
     tokenAmountOut = result.tokenAmountOut;
@@ -388,20 +389,20 @@ describe("Test Trade Router contract for Data Pools", function () {
     console.log("Ref Fee - ", refFee.toString());
 
     console.log("Trader Address - ", trader.address);
-    let dtBalPreTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPreTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance pre-trade - ", dtBalPreTrade.toString());
     let oceanBalPreTrade = await oceanToken.balanceOf(trader.address);
     console.log("OCEAN balance pre-trade - ", oceanBalPreTrade.toString());
-    let postCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, tokenAmountOut, REF_FEES],[OCEAN_ADDRESS], false, ethers.utils.formatBytes32String("0")];
-    await poolDT.connect(trader).approve(tradeRouter.address, dtAmountIn);
-    let allowance  = await poolDT.allowance(trader.address, tradeRouter.address);
+    let postCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, tokenAmountOut, REF_FEES],[OCEAN_ADDRESS], true, FRE_ID];
+    await freDT.connect(trader).approve(tradeRouter.address, dtAmountIn);
+    let allowance  = await freDT.allowance(trader.address, tradeRouter.address);
     console.log("Trade Router allowance - ", allowance.toString());
     let tradeRes = await tradeRouter.connect(trader).swapExactDatatokenToToken(postCalcInfo);
     //console.log(tradeRes);
   
     let oceanBalPostTrade = await oceanToken.balanceOf(trader.address);
     console.log("OCEAN balance post-trade - ", oceanBalPostTrade.toString());
-    let dtBalPostTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPostTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance post-trade - ", dtBalPostTrade.toString());
     expect((dtBalPreTrade.sub(dtBalPostTrade))).to.gte(dtAmountIn);
     expect((oceanBalPostTrade.sub(oceanBalPreTrade))).to.eq(tokenAmountOut);
@@ -412,7 +413,7 @@ describe("Test Trade Router contract for Data Pools", function () {
     dtAmountIn = 0,
     tokenAmountOut = ethers.utils.parseEther('1');
 
-    let preCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, tokenAmountOut, REF_FEES],[OCEAN_ADDRESS], false, ethers.utils.formatBytes32String("0")];
+    let preCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, tokenAmountOut, REF_FEES],[OCEAN_ADDRESS], true, FRE_ID];
     let result = await tradeRouter.calcDatatokenInGivenTokenOut(preCalcInfo);
     //console.log(result);
     dtAmountIn = result.dtAmountIn;
@@ -426,20 +427,20 @@ describe("Test Trade Router contract for Data Pools", function () {
     console.log("Ref Fee - ", refFee.toString());
 
     console.log("Trader Address - ", trader.address);
-    let dtBalPreTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPreTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance pre-trade - ", dtBalPreTrade.toString());
     let oceanBalPreTrade = await oceanToken.balanceOf(trader.address);
     console.log("OCEAN balance pre-trade - ", oceanBalPreTrade.toString());
-    let postCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, tokenAmountOut, REF_FEES],[OCEAN_ADDRESS], false, ethers.utils.formatBytes32String("0")];
-    await poolDT.connect(trader).approve(tradeRouter.address, dtAmountIn);
-    let allowance  = await poolDT.allowance(trader.address, tradeRouter.address);
+    let postCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, tokenAmountOut, REF_FEES],[OCEAN_ADDRESS], true, FRE_ID];
+    await freDT.connect(trader).approve(tradeRouter.address, dtAmountIn);
+    let allowance  = await freDT.allowance(trader.address, tradeRouter.address);
     console.log("Trade Router allowance - ", allowance.toString());
     let tradeRes = await tradeRouter.connect(trader).swapDatatokenToExactToken(postCalcInfo);
     //console.log(tradeRes);
   
     let oceanBalPostTrade = await oceanToken.balanceOf(trader.address);
     console.log("OCEAN balance post-trade - ", oceanBalPostTrade.toString());
-    let dtBalPostTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPostTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance post-trade - ", dtBalPostTrade.toString());
     expect((dtBalPreTrade.sub(dtBalPostTrade))).to.gte(dtAmountIn);
     expect((oceanBalPostTrade.sub(oceanBalPreTrade))).to.eq(tokenAmountOut);
@@ -451,7 +452,7 @@ describe("Test Trade Router contract for Data Pools", function () {
     ethAmountOut = 0;
 
     console.log("DT Amount In - ", dtAmountIn.toString())
-    let preCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, ethAmountOut, REF_FEES],[OCEAN_ADDRESS,WETH_ADDRESS], false, ethers.utils.formatBytes32String("0")];
+    let preCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, ethAmountOut, REF_FEES],[OCEAN_ADDRESS,WETH_ADDRESS], true, FRE_ID];
     let result = await tradeRouter.calcTokenOutGivenDatatokenIn(preCalcInfo);
     //console.log(result);
     ethAmountOut = result.tokenAmountOut;
@@ -465,16 +466,16 @@ describe("Test Trade Router contract for Data Pools", function () {
     console.log("Ref Fee - ", refFee.toString());
 
     console.log("Trader Address - ", trader.address);
-    let dtBalPreTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPreTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance pre-trade - ", dtBalPreTrade.toString());
-    let postCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, ethAmountOut, REF_FEES],[OCEAN_ADDRESS,WETH_ADDRESS], false, ethers.utils.formatBytes32String("0")];
-    await poolDT.connect(trader).approve(tradeRouter.address, dtAmountIn);
-    let allowance  = await poolDT.allowance(trader.address, tradeRouter.address);
+    let postCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, ethAmountOut, REF_FEES],[OCEAN_ADDRESS,WETH_ADDRESS], true, FRE_ID];
+    await freDT.connect(trader).approve(tradeRouter.address, dtAmountIn);
+    let allowance  = await freDT.allowance(trader.address, tradeRouter.address);
     console.log("Trade Router allowance - ", allowance.toString());
     let tradeRes = await tradeRouter.connect(trader).swapExactDatatokenToETH(postCalcInfo);
     //console.log(tradeRes);
   
-    let dtBalPostTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPostTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance post-trade - ", dtBalPostTrade.toString());
     expect((dtBalPreTrade.sub(dtBalPostTrade)).toString()).to.equal(dtAmountIn);
     
@@ -485,7 +486,7 @@ describe("Test Trade Router contract for Data Pools", function () {
     dtAmountIn = 0,
     ethAmountOut = ethers.utils.parseEther('1');
 
-    let preCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, ethAmountOut, REF_FEES],[OCEAN_ADDRESS,WETH_ADDRESS], false, ethers.utils.formatBytes32String("0")];
+    let preCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, ethAmountOut, REF_FEES],[OCEAN_ADDRESS,WETH_ADDRESS], true, FRE_ID];
     let result = await tradeRouter.calcDatatokenInGivenTokenOut(preCalcInfo);
     //console.log(result);
     dtAmountIn = result.dtAmountIn;
@@ -499,15 +500,15 @@ describe("Test Trade Router contract for Data Pools", function () {
     console.log("Ref Fee - ", refFee.toString());
 
     console.log("Trader Address - ", trader.address);
-    let dtBalPreTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPreTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance pre-trade - ", dtBalPreTrade.toString());
-    let postCalcInfo =[[POOL_ADDRESS, POOL_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, ethAmountOut, REF_FEES],[OCEAN_ADDRESS,WETH_ADDRESS], false, ethers.utils.formatBytes32String("0")];
-    await poolDT.connect(trader).approve(tradeRouter.address, dtAmountIn);
-    let allowance  = await poolDT.allowance(trader.address, tradeRouter.address);
+    let postCalcInfo =[[FRE_ADDRESS, FRE_DT_ADDRESS, trader.address, referrer.address, adapter.address, oceanToken.address],[dtAmountIn, baseAmountNeeded, ethAmountOut, REF_FEES],[OCEAN_ADDRESS,WETH_ADDRESS], true, FRE_ID];
+    await freDT.connect(trader).approve(tradeRouter.address, dtAmountIn);
+    let allowance  = await freDT.allowance(trader.address, tradeRouter.address);
     console.log("Trade Router allowance - ", allowance.toString());
     let tradeRes = await tradeRouter.connect(trader).swapDatatokenToExactToken(postCalcInfo);
     //console.log(tradeRes);
-    let dtBalPostTrade = await poolDT.balanceOf(trader.address);
+    let dtBalPostTrade = await freDT.balanceOf(trader.address);
     console.log("DT balance post-trade - ", dtBalPostTrade.toString());
     expect((dtBalPreTrade.sub(dtBalPostTrade))).to.gte(dtAmountIn);
 

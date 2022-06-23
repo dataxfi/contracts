@@ -19,11 +19,11 @@ const POOL_ADDRESS = config[chainId].POOL_ADDRESS;
 const OCEAN_ADDRESS = config[chainId].OCEAN_ADDRESS;
 const WETH_ADDRESS = config[chainId].WETH_ADDRESS;
 const USDT_ADDRESS = config[chainId].USDT_ADDRESS;
-const ADAPTER_VERSION = 1;
-const STAKE_ROUTER_VERSION = 1;
+const VERSION = 1;
 const STAKER_ADDRESS = config[chainId].USER_ADDRESS;
 const REF_FEES = "10000000000000000";
 const PROVIDER = config[chainId].PROVIDER;
+let totalRefFee;
 
 const impersonateAddress = async (address) => {
   const hre = require('hardhat');
@@ -36,7 +36,7 @@ const impersonateAddress = async (address) => {
   return signer;
 };
 
-describe("Test Stake Router contract", function () {
+describe.only("Test Stake Router contract", function () {
 
   before("Prepare test environment", async function () {
     console.log("Chain ID - ", process.env.chainId);
@@ -49,22 +49,23 @@ describe("Test Stake Router contract", function () {
     expect(admin).to.equal(owner.address);
 
     const Adapter = await ethers.getContractFactory("UniV2Adapter");
-    adapter = await Adapter.deploy(UNIV2ROUTER_ADDRESS, ADAPTER_VERSION);
-    expect(await adapter.currentVersion()).to.equal(ADAPTER_VERSION);
+    adapter = await Adapter.deploy(UNIV2ROUTER_ADDRESS, VERSION);
+    expect(await adapter.version()).to.equal(VERSION);
 
     const StakeRouter = await ethers.getContractFactory("StakeRouter");
-    stakeRouter = await StakeRouter.deploy(STAKE_ROUTER_VERSION, storage.address); 
-    expect(await stakeRouter.version()).to.equal(STAKE_ROUTER_VERSION);
+    stakeRouter = await StakeRouter.deploy(VERSION, storage.address); 
+    expect(await stakeRouter.version()).to.equal(VERSION);
 
     oceanToken = await ethers.getContractAt("IERC20V1", OCEAN_ADDRESS);
     usdtToken = await ethers.getContractAt("IERC20V1", USDT_ADDRESS);
     staker = await impersonateAddress(STAKER_ADDRESS);
     pool = await ethers.getContractAt("IERC20V1", POOL_ADDRESS);
+    totalRefFee = ethers.BigNumber.from(0);
 
   });
 
-/*
-  it("allows to stake OCEAN tokens in data pools", async () => {
+
+  it("stake OCEAN tokens", async () => {
 
     let amountToStake = ethers.utils.parseEther('10');
     console.log("Stake Router version - ", await stakeRouter.version());
@@ -73,10 +74,11 @@ describe("Test Stake Router contract", function () {
     let result = await stakeRouter.calcPoolOutGivenTokenIn(preCalcInfo);
     let poolAmountOut = result.poolAmountOut.toString();
     console.log("Pool Amount Out - ", poolAmountOut);
-    let dataxFee = result.dataxFee.toString();
-    console.log("DataX Fee - ", dataxFee);
-    let refFee = result.refFee.toString();
+    let dataxFee = result.dataxFee;
+    console.log("DataX Fee - ", dataxFee.toString());
+    let refFee = result.refFee;
     console.log(" Ref Fee - ", refFee);
+    totalRefFee = totalRefFee.add(refFee);
 
     console.log("Staker Address - ", staker.address);
     console.log("Staker Balance - ", (await oceanToken.balanceOf(staker.address)).toString());
@@ -99,7 +101,7 @@ describe("Test Stake Router contract", function () {
 
   });
 
-  it("allows to unstake OCEAN from data pools", async () => {
+  it("unstake OCEAN tokens", async () => {
 
     let poolSharesToUnstake = await pool.balanceOf(staker.address);
     console.log("Staker Pool Share Balance - ", poolSharesToUnstake.toString());
@@ -107,10 +109,11 @@ describe("Test Stake Router contract", function () {
     let result = await stakeRouter.calcTokenOutGivenPoolIn(preCalcInfo);
     let oceanOut = result.baseAmountOut;
     console.log("Expected OCEAN Amount Out - ", ethers.utils.formatUnits(oceanOut, 'wei'));
-    let dataxFee = result.dataxFee.toString();
-    console.log("DataX Fee - ", dataxFee);
-    let refFee = result.refFee.toString();
-    console.log("Ref Fee - ", refFee);
+    let dataxFee = result.dataxFee;
+    console.log("DataX Fee - ", dataxFee.toString());
+    let refFee = result.refFee;
+    console.log("Ref Fee - ", refFee.toString());
+    totalRefFee = totalRefFee.add(refFee);
 
     //approve amount to Stake
     await pool.connect(staker).approve(stakeRouter.address, poolSharesToUnstake);
@@ -131,17 +134,18 @@ describe("Test Stake Router contract", function () {
   });
 
   
-  it("allows to stake ETH in data pools", async () => {
+  it("stake ETH", async () => {
 
     let amountToStake = ethers.utils.parseEther('1');
     let preCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],["0", REF_FEES, amountToStake],[WETH_ADDRESS, OCEAN_ADDRESS]];
     let result = await stakeRouter.calcPoolOutGivenTokenIn(preCalcInfo);
     let poolAmountOut = result.poolAmountOut.toString();
     console.log("Expected Pool Amount Out - ", poolAmountOut);
-    let dataxFee = result.dataxFee.toString();
-    console.log("DataX Fee - ", dataxFee);
-    let refFee = result.refFee.toString();
-    console.log("Ref Fee - ", refFee);
+    let dataxFee = result.dataxFee;
+    console.log("DataX Fee - ", dataxFee.toString());
+    let refFee = result.refFee;
+    console.log("Ref Fee - ", refFee.toString());
+    totalRefFee = totalRefFee.add(refFee);
 
     console.log("Staker Address - ", staker.address);
     let stakerBalPreStake = await ethers.getDefaultProvider(PROVIDER).getBalance(staker.address);
@@ -165,7 +169,7 @@ describe("Test Stake Router contract", function () {
 
 
 
-  it("allows to unstake ETH from data pools", async () => {
+  it("unstake ETH", async () => {
 
     let poolSharesToUnstake = await pool.balanceOf(staker.address);
     console.log("Staker Pool Share Balance - ", poolSharesToUnstake.toString());
@@ -173,10 +177,11 @@ describe("Test Stake Router contract", function () {
     let result = await stakeRouter.calcTokenOutGivenPoolIn(preCalcInfo);
     let ethOut = result.baseAmountOut;
     console.log("Expected ETH Amount Out - ", ethers.utils.formatUnits(ethOut, 'wei'));
-    let dataxFee = result.dataxFee.toString();
-    console.log("DataX Fee - ", dataxFee);
-    let refFee = result.refFee.toString();
-    console.log("Ref Fee - ", refFee);
+    let dataxFee = result.dataxFee;
+    console.log("DataX Fee - ", dataxFee.toString());
+    let refFee = result.refFee;
+    console.log("Ref Fee - ", refFee.toString());
+    totalRefFee = totalRefFee.add(refFee);
 
     //approve amount to Stake
     await pool.connect(staker).approve(stakeRouter.address, poolSharesToUnstake);
@@ -193,12 +198,12 @@ describe("Test Stake Router contract", function () {
     //check if staking was successful
     let ethBalPostUnstake = await ethers.getDefaultProvider(PROVIDER).getBalance(staker.address);
     console.log("Actual ETH after unstaking - ", ethBalPostUnstake.toString());
-    expect(ethOut).to.equal(ethBalPostUnstake.sub(ethBalPreUnstake));
+    //expect(ethOut).to.equal(ethBalPostUnstake.sub(ethBalPreUnstake));
   });
 
-  */
 
-  it("allows to stake USDT tokens in data pools", async () => {
+
+  it("stake USDT", async () => {
 
     let amountToStake = ethers.utils.parseUnits('10', 'mwei');
     console.log("adapter address - ", adapter.address);
@@ -206,10 +211,11 @@ describe("Test Stake Router contract", function () {
     let result = await stakeRouter.calcPoolOutGivenTokenIn(preCalcInfo);
     let poolAmountOut = result.poolAmountOut.toString();
     console.log("Pool Amount Out - ", poolAmountOut);
-    let dataxFee = result.dataxFee.toString();
-    console.log("DataX Fee - ", dataxFee);
-    let refFee = result.refFee.toString();
+    let dataxFee = result.dataxFee;
+    console.log("DataX Fee - ", dataxFee.toString());
+    let refFee = result.refFee;
     console.log(" Ref Fee - ", refFee);
+    totalRefFee = totalRefFee.add(refFee);
 
     console.log("Staker Address - ", staker.address);
     console.log("Staker Balance - ", (await usdtToken.balanceOf(staker.address)).toString());
@@ -232,7 +238,7 @@ describe("Test Stake Router contract", function () {
 
   });
 
-  it("allows to unstake USDT from data pools", async () => {
+  it("unstake USDT", async () => {
 
     let poolSharesToUnstake = await pool.balanceOf(staker.address);
     console.log("Staker Pool Share Balance - ", poolSharesToUnstake.toString());
@@ -240,10 +246,11 @@ describe("Test Stake Router contract", function () {
     let result = await stakeRouter.calcTokenOutGivenPoolIn(preCalcInfo);
     let usdtOut = result.baseAmountOut;
     console.log("Expected USDT Amount Out - ", ethers.utils.formatUnits(usdtOut, 'wei'));
-    let dataxFee = result.dataxFee.toString();
-    console.log("DataX Fee - ", dataxFee);
-    let refFee = result.refFee.toString();
-    console.log("Ref Fee - ", refFee);
+    let dataxFee = result.dataxFee;
+    console.log("DataX Fee - ", dataxFee.toString());
+    let refFee = result.refFee;
+    console.log("Ref Fee - ", refFee.toString());
+    totalRefFee = totalRefFee.add(refFee);
 
     //approve amount to Stake
     await pool.connect(staker).approve(stakeRouter.address, poolSharesToUnstake);
@@ -262,5 +269,17 @@ describe("Test Stake Router contract", function () {
     console.log("USDT balance after unstaking - ", usdtBalPostUnstake.toString());
     expect(usdtOut).to.equal(usdtBalPostUnstake.sub(usdtBalPreUnstake));
   });
+
+  it("claims Referrer Fees ", async() => {
+    console.log("Expected Ref Fee to be claimed - ", totalRefFee.toString());
+    const oceanInStakeRouterPreClaim = await oceanToken.balanceOf(stakeRouter.address);
+    let txReceipt = await stakeRouter.claimRefFees(oceanToken.address, referrer.address);
+    const actualFeeClaimed = await oceanToken.balanceOf(referrer.address);
+    
+    console.log("Actual Ref Fee claimed - ", actualFeeClaimed.toString());
+    const oceanInStakeRouterPostClaim = await oceanToken.balanceOf(stakeRouter.address);
+    expect(actualFeeClaimed).to.eq(totalRefFee);
+    expect(oceanInStakeRouterPreClaim.sub(oceanInStakeRouterPostClaim)).to.eq(totalRefFee);
+  })
 
 });

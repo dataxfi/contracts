@@ -156,6 +156,8 @@ contract FRERouter is ReentrancyGuard, Math {
         bytes32 exchangeId,
         uint256 dtAmountIn
     ) public view returns (uint256 baseAmountOut) {
+        console.log("FRE Exchange ID ");
+        console.logBytes32(exchangeId);
         IFixedRateExchange fre = IFixedRateExchange(exchangeAddress);
         (baseAmountOut, , , ) = fre.calcBaseOutGivenInDT(
             exchangeId,
