@@ -60,7 +60,7 @@ contract StakeRouter is ReentrancyGuard, Math {
 
     struct StakeInfo {
         address[4] meta; //[pool, to, refAddress, adapterAddress]
-        uint256[3] uints; //[amountOut/minAmountOut, refFees, amountIn/maxAmountIn]
+        uint256[3] uints; //[amountIn/maxAmountIn, refFees, amountOut/minAmountOut]
         address[] path;
     }
 
@@ -122,7 +122,7 @@ contract StakeRouter is ReentrancyGuard, Math {
         //stake tokens in Pool
         poolTokensOut = pool.joinswapExternAmountIn(
             baseAmountOut,
-            info.uints[0]
+            info.uints[2]
         );
 
         //transfer pool tokens to destination address
@@ -151,7 +151,7 @@ contract StakeRouter is ReentrancyGuard, Math {
         );
 
         require(
-            info.uints[2] <=
+            info.uints[0] <=
                 IERC20(info.meta[0]).allowance(msg.sender, address(this)),
             "StakeRouter: Not enough token allowance"
         );
@@ -164,14 +164,14 @@ contract StakeRouter is ReentrancyGuard, Math {
         IERC20(info.meta[0]).transferFrom(
             msg.sender,
             address(this),
-            info.uints[2]
+            info.uints[0]
         );
-        IERC20(info.meta[0]).approve(address(pool), info.uints[2]);
+        IERC20(info.meta[0]).approve(address(pool), info.uints[0]);
 
         //unstake baseToken from Pool
         uint256 baseAmountOutSansFee = pool.exitswapPoolAmountIn(
-            info.uints[2],
-            info.uints[0]
+            info.uints[0],
+            info.uints[2]
         );
 
         //deduct fees
@@ -228,35 +228,35 @@ contract StakeRouter is ReentrancyGuard, Math {
         );
 
         require(
-            info.uints[2] <=
+            info.uints[0] <=
                 IERC20(info.path[0]).allowance(msg.sender, address(this)),
             "StakeRouter: Not enough token allowance"
         );
 
         IERC20 baseToken = IERC20(info.path[info.path.length - 1]);
-        uint256 baseAmountOutSansFee = info.uints[2];
+        uint256 baseAmountOutSansFee = info.uints[0];
 
         require(
-            IERC20(info.path[0]).balanceOf(msg.sender) >= info.uints[2],
+            IERC20(info.path[0]).balanceOf(msg.sender) >= info.uints[0],
             "StakeRouter: Not enough tokenIn balance"
         );
         IERC20(info.path[0]).transferFrom(
             msg.sender,
             address(this),
-            info.uints[2]
+            info.uints[0]
         );
 
         //skip if tokenIn is baseToken
         if (info.path.length > 1) {
             IAdapter adapter = IAdapter(info.meta[3]);
             uint256[] memory amounts = adapter.getAmountsOut(
-                info.uints[2],
+                info.uints[0],
                 info.path
             );
 
-            IERC20(info.path[0]).approve(info.meta[3], info.uints[2]);
+            IERC20(info.path[0]).approve(info.meta[3], info.uints[0]);
             baseAmountOutSansFee = adapter.swapExactTokensForTokens(
-                info.uints[2],
+                info.uints[0],
                 amounts[info.path.length - 1],
                 info.path,
                 address(this)
@@ -292,7 +292,7 @@ contract StakeRouter is ReentrancyGuard, Math {
         //stake tokens in Pool
         poolTokensOut = pool.joinswapExternAmountIn(
             baseAmountOut,
-            info.uints[0]
+            info.uints[2]
         );
 
         //transfer pool tokens to destination address
@@ -306,7 +306,7 @@ contract StakeRouter is ReentrancyGuard, Math {
             info.path[0],
             info.meta[1],
             info.meta[2],
-            info.uints[2],
+            info.uints[0],
             baseAmountOut
         );
     }
@@ -322,7 +322,7 @@ contract StakeRouter is ReentrancyGuard, Math {
         );
 
         require(
-            info.uints[2] <=
+            info.uints[0] <=
                 IERC20(info.meta[0]).allowance(msg.sender, address(this)),
             "StakeRouter: Not enough token allowance"
         );
@@ -332,14 +332,14 @@ contract StakeRouter is ReentrancyGuard, Math {
         IERC20(info.meta[0]).transferFrom(
             msg.sender,
             address(this),
-            info.uints[2]
+            info.uints[0]
         );
-        IERC20(info.meta[0]).approve(address(pool), info.uints[2]);
+        IERC20(info.meta[0]).approve(address(pool), info.uints[0]);
 
         //unstake baseToken from Pool
         uint256 baseAmountOutSansFee = pool.exitswapPoolAmountIn(
-            info.uints[2],
-            info.uints[0]
+            info.uints[0],
+            info.uints[2]
         );
 
         IERC20 baseToken = IERC20(info.path[0]);
@@ -391,7 +391,7 @@ contract StakeRouter is ReentrancyGuard, Math {
             info.path[0],
             info.meta[1],
             info.meta[2],
-            info.uints[2],
+            info.uints[0],
             baseAmountOut
         );
     }
@@ -406,13 +406,13 @@ contract StakeRouter is ReentrancyGuard, Math {
             uint256 refFee
         )
     {
-        uint256 amountIn = info.uints[2];
+        uint256 amountIn = info.uints[0];
 
         //skip if tokenOut is the baseToken
         if (info.path.length > 1) {
             IAdapter adapter = IAdapter(info.meta[3]);
             uint256[] memory amounts = adapter.getAmountsOut(
-                info.uints[2],
+                info.uints[0],
                 info.path
             );
             amountIn = amounts[amounts.length - 1];
@@ -438,13 +438,13 @@ contract StakeRouter is ReentrancyGuard, Math {
             uint256 refFee
         )
     {
-        uint256 amountOut = info.uints[0];
+        uint256 amountOut = info.uints[2];
 
         //skip if tokenOut is the baseToken
         if (info.path.length > 1) {
             IAdapter adapter = IAdapter(info.meta[3]);
             uint256[] memory amounts = adapter.getAmountsIn(
-                info.uints[0],
+                info.uints[2],
                 info.path
             );
             amountOut = amounts[0];
@@ -470,7 +470,7 @@ contract StakeRouter is ReentrancyGuard, Math {
         IPool pool = IPool(info.meta[0]);
         uint256 baseAmountOutSansFee = pool.calcSingleOutPoolIn(
             info.path[0],
-            info.uints[2]
+            info.uints[0]
         );
 
         (dataxFee, refFee) = calcFees(
