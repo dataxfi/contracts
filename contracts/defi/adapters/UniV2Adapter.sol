@@ -14,14 +14,12 @@ contract UniV2Adapter {
     IUniswapV2Router02 uniswapRouter;
     using SafeERC20 for ERC20;
     using SafeMath for uint256;
-    uint256 public version;
     uint256 private constant DEADLINE = 600; //10 mins
 
     event Swapped(address[] path, uint256 amountOut);
 
-    constructor(address _routerAddress, uint256 _version) {
+    constructor(address _routerAddress) {
         uniswapRouter = IUniswapV2Router02(_routerAddress);
-        version = _version;
     }
 
     //check if this contract has needed spending allowance

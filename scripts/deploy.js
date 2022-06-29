@@ -6,31 +6,29 @@
 const hre = require('hardhat')
 
 async function main() {
-  // Hardhat always runs the compile task when running scripts with its command
-  // line interface.
-  //
-  // If this script is run directly using `node` you may want to call compile
-  // manually to make sure everything is compiled
-  // await hre.run('compile');
+  const [deployer] = await ethers.getSigners();
+  const UNIV2ROUTER_ADDRESS = "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff";
+  const VERSION = 1;
 
-  // We get the contract to deploy
-  const OceanJellys = await hre.ethers.getContractFactory('OceanJellys')
-  const oceanJellysInst = await OceanJellys.deploy(
-    'https://test.base.com',
-    '20000000000000000000',
-    '0x8967bcf84170c91b0d24d4302c2376283b0b3a07'
-  )
+  console.log("Deploying contracts with the account:", deployer.address);
 
-  await oceanJellysInst.deployed()
+  console.log("Account balance:", (await deployer.getBalance()).toString());
 
-  console.log('OceanJellys deployed to:', oceanJellysInst.address)
+
+  //const Adapter = await ethers.getContractFactory("UniV2Adapter");
+  //const adapter = await Adapter.deploy(UNIV2ROUTER_ADDRESS, VERSION);
+  //console.log("Adapter address:", adapter.address);
+
+
+  const StakeRouter = await ethers.getContractFactory("StakeRouter");
+  const stakeRouter = await StakeRouter.deploy();
+  console.log("StakeRouter address:", stakeRouter.address); 
+
 }
 
-// We recommend this pattern to be able to use async/await everywhere
-// and properly handle errors.
 main()
   .then(() => process.exit(0))
   .catch((error) => {
-    console.error(error)
-    process.exit(1)
-  })
+    console.error(error);
+    process.exit(1);
+  });

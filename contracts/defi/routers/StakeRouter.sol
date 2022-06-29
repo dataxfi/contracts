@@ -6,14 +6,13 @@ import "../../interfaces/defi/IAdapter.sol";
 import "../../interfaces/ocean/IPool.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "../../interfaces/defi/IStorage.sol";
-import "../utils/Math.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "../utils/Fee.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract StakeRouter is ReentrancyGuard, Math {
+contract StakeRouter is ReentrancyGuard, Fee {
     using SafeMath for uint256;
-    IStorage store;
-    uint8 public version;
+    using SafeERC20 for IERC20;
     mapping(address => mapping(address => uint256)) public referralFees;
     string constant STAKE_FEE_TYPE = "STAKE";
     string constant UNSTAKE_FEE_TYPE = "UNSTAKE";
@@ -64,9 +63,8 @@ contract StakeRouter is ReentrancyGuard, Math {
         address[] path;
     }
 
-    constructor(uint8 _version, address _storage) {
-        version = _version;
-        store = IStorage(_storage);
+    constructor() {
+        admin = msg.sender;
     }
 
     function stakeETHInDTPool(StakeInfo calldata info)
@@ -106,6 +104,14 @@ contract StakeRouter is ReentrancyGuard, Math {
             referralFees[info.meta[2]][address(baseToken)] = referralFees[
                 info.meta[2]
             ][address(baseToken)].add(refFee);
+            //datax fee
+            referralFees[admin][address(baseToken)] = referralFees[admin][
+                address(baseToken)
+            ].add(dataxFee);
+        } else {
+            referralFees[admin][address(baseToken)] = referralFees[admin][
+                address(baseToken)
+            ].add(badd(dataxFee, refFee));
         }
 
         // actual base amount minus fees
@@ -114,10 +120,7 @@ contract StakeRouter is ReentrancyGuard, Math {
             badd(dataxFee, refFee)
         );
         //approve Pool to spend base token
-        require(
-            baseToken.approve(address(pool), baseAmountOut),
-            "StakeRouter: Failed to approve Basetoken on Pool"
-        );
+        baseToken.safeApprove(address(pool), baseAmountOut);
 
         //stake tokens in Pool
         poolTokensOut = pool.joinswapExternAmountIn(
@@ -126,10 +129,7 @@ contract StakeRouter is ReentrancyGuard, Math {
         );
 
         //transfer pool tokens to destination address
-        require(
-            IERC20(info.meta[0]).transfer(info.meta[1], poolTokensOut),
-            "StakeRouter: Pool Token transfer failed"
-        );
+        IERC20(info.meta[0]).safeTransfer(info.meta[1], poolTokensOut);
 
         emit StakedETHInPool(
             info.meta[0],
@@ -161,12 +161,12 @@ contract StakeRouter is ReentrancyGuard, Math {
         IERC20 baseToken = IERC20(info.path[0]);
         //unstake into baseToken
         IPool pool = IPool(info.meta[0]);
-        IERC20(info.meta[0]).transferFrom(
+        IERC20(info.meta[0]).safeTransferFrom(
             msg.sender,
             address(this),
             info.uints[0]
         );
-        IERC20(info.meta[0]).approve(address(pool), info.uints[0]);
+        IERC20(info.meta[0]).safeApprove(address(pool), info.uints[0]);
 
         //unstake baseToken from Pool
         uint256 baseAmountOutSansFee = pool.exitswapPoolAmountIn(
@@ -185,6 +185,14 @@ contract StakeRouter is ReentrancyGuard, Math {
             referralFees[info.meta[2]][address(baseToken)] = referralFees[
                 info.meta[2]
             ][address(baseToken)].add(refFee);
+            //datax fee
+            referralFees[admin][address(baseToken)] = referralFees[admin][
+                address(baseToken)
+            ].add(dataxFee);
+        } else {
+            referralFees[admin][address(baseToken)] = referralFees[admin][
+                address(baseToken)
+            ].add(badd(dataxFee, refFee));
         }
         // actual base amount minus fees
         uint256 baseAmountOut = bsub(
@@ -192,7 +200,7 @@ contract StakeRouter is ReentrancyGuard, Math {
             badd(dataxFee, refFee)
         );
 
-        baseToken.approve(info.meta[3], baseAmountOut);
+        baseToken.safeApprove(info.meta[3], baseAmountOut);
 
         //swap to output token
         IAdapter adapter = IAdapter(info.meta[3]);
@@ -240,7 +248,7 @@ contract StakeRouter is ReentrancyGuard, Math {
             IERC20(info.path[0]).balanceOf(msg.sender) >= info.uints[0],
             "StakeRouter: Not enough tokenIn balance"
         );
-        IERC20(info.path[0]).transferFrom(
+        IERC20(info.path[0]).safeTransferFrom(
             msg.sender,
             address(this),
             info.uints[0]
@@ -254,7 +262,7 @@ contract StakeRouter is ReentrancyGuard, Math {
                 info.path
             );
 
-            IERC20(info.path[0]).approve(info.meta[3], info.uints[0]);
+            IERC20(info.path[0]).safeApprove(info.meta[3], info.uints[0]);
             baseAmountOutSansFee = adapter.swapExactTokensForTokens(
                 info.uints[0],
                 amounts[info.path.length - 1],
@@ -274,6 +282,14 @@ contract StakeRouter is ReentrancyGuard, Math {
             referralFees[info.meta[2]][address(baseToken)] = referralFees[
                 info.meta[2]
             ][address(baseToken)].add(refFee);
+            //datax fee
+            referralFees[admin][address(baseToken)] = referralFees[admin][
+                address(baseToken)
+            ].add(dataxFee);
+        } else {
+            referralFees[admin][address(baseToken)] = referralFees[admin][
+                address(baseToken)
+            ].add(badd(dataxFee, refFee));
         }
         // actual base amount minus fees
         uint256 baseAmountOut = bsub(
@@ -284,10 +300,7 @@ contract StakeRouter is ReentrancyGuard, Math {
         //handle Pool swap
         IPool pool = IPool(info.meta[0]);
         //approve Pool to spend base token
-        require(
-            baseToken.approve(info.meta[0], baseAmountOut),
-            "StakeRouter: Failed to approve Basetoken on Pool"
-        );
+        baseToken.safeApprove(info.meta[0], baseAmountOut);
 
         //stake tokens in Pool
         poolTokensOut = pool.joinswapExternAmountIn(
@@ -296,10 +309,7 @@ contract StakeRouter is ReentrancyGuard, Math {
         );
 
         //transfer pool tokens to destination address
-        require(
-            IERC20(info.meta[0]).transfer(info.meta[1], poolTokensOut),
-            "Error: Pool Token transfer failed"
-        );
+        IERC20(info.meta[0]).safeTransfer(info.meta[1], poolTokensOut);
 
         emit StakedTokenInPool(
             info.meta[0],
@@ -329,12 +339,12 @@ contract StakeRouter is ReentrancyGuard, Math {
 
         //unstake into baseToken
         IPool pool = IPool(info.meta[0]);
-        IERC20(info.meta[0]).transferFrom(
+        IERC20(info.meta[0]).safeTransferFrom(
             msg.sender,
             address(this),
             info.uints[0]
         );
-        IERC20(info.meta[0]).approve(address(pool), info.uints[0]);
+        IERC20(info.meta[0]).safeApprove(address(pool), info.uints[0]);
 
         //unstake baseToken from Pool
         uint256 baseAmountOutSansFee = pool.exitswapPoolAmountIn(
@@ -355,6 +365,14 @@ contract StakeRouter is ReentrancyGuard, Math {
             referralFees[info.meta[2]][address(baseToken)] = referralFees[
                 info.meta[2]
             ][address(baseToken)].add(refFee);
+            //datax fee
+            referralFees[admin][address(baseToken)] = referralFees[admin][
+                address(baseToken)
+            ].add(dataxFee);
+        } else {
+            referralFees[admin][address(baseToken)] = referralFees[admin][
+                address(baseToken)
+            ].add(badd(dataxFee, refFee));
         }
         // actual base amount minus fees
         uint256 baseAmountOut = bsub(
@@ -364,7 +382,7 @@ contract StakeRouter is ReentrancyGuard, Math {
 
         //skip if tokenOut is the baseToken
         if (info.path.length > 1) {
-            baseToken.approve(info.meta[3], baseAmountOut);
+            baseToken.safeApprove(info.meta[3], baseAmountOut);
             //swap to output token
             IAdapter adapter = IAdapter(info.meta[3]);
             //swap basetoken to Destination token
@@ -380,10 +398,7 @@ contract StakeRouter is ReentrancyGuard, Math {
             );
         } else {
             //send tokenOut to destination address
-            require(
-                baseToken.transfer(info.meta[1], baseAmountOut),
-                "StakeRouter: Failed to transfer tokenOut"
-            );
+            baseToken.safeTransfer(info.meta[1], baseAmountOut);
         }
 
         emit UnstakedTokenFromPool(
@@ -491,28 +506,6 @@ contract StakeRouter is ReentrancyGuard, Math {
         }
     }
 
-    //calculate fees
-    function calcFees(
-        uint256 baseAmount,
-        string memory feeType,
-        uint256 refFeeRate
-    ) public view returns (uint256 dataxFee, uint256 refFee) {
-        uint256 feeRate = store.getFees(feeType);
-        require(
-            refFeeRate <= bsub(BONE, feeRate),
-            "StakeRouter: Ref Fees too high"
-        );
-
-        // DataX Fees
-        if (feeRate != 0) {
-            dataxFee = bsub(baseAmount, bmul(baseAmount, bsub(BONE, feeRate)));
-        }
-        // Referral fees
-        if (refFeeRate != 0) {
-            refFee = bsub(baseAmount, bmul(baseAmount, bsub(BONE, refFeeRate)));
-        }
-    }
-
     //claim collected Referral fees
     function claimRefFees(address token, address referrer)
         external
@@ -525,10 +518,7 @@ contract StakeRouter is ReentrancyGuard, Math {
         //reset claimable amount
         referralFees[referrer][token] = 0;
         //transfer tokens to referrer
-        require(
-            baseToken.transfer(referrer, claimAmount),
-            "StakeRouter: Referral Token claim failed"
-        );
+        baseToken.safeTransfer(referrer, claimAmount);
 
         emit ReferralFeesClaimed(referrer, token, claimAmount);
     }

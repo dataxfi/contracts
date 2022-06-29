@@ -2,7 +2,7 @@ pragma solidity >=0.8.0 <0.9.0;
 //Copyright of DataX Protocol contributors
 //SPDX-License-Identifier: BSU-1.1
 
-import "../interfaces/ocean/IFixedRateExchange.sol";
+import "../../interfaces/ocean/IFixedRateExchange.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
@@ -13,10 +13,6 @@ import "hardhat/console.sol";
 
 contract FRERouter is ReentrancyGuard, Math {
     using SafeMath for uint256;
-    uint8 public version;
-    uint256 private constant ZERO_FEES = 0;
-    uint256 private constant BASE = 1e18;
-
     struct Exchange {
         uint256 dtDecimals;
         uint256 btDecimals;
@@ -25,9 +21,7 @@ contract FRERouter is ReentrancyGuard, Math {
         uint256 oceanFee;
     }
 
-    constructor(uint8 _version) {
-        version = _version;
-    }
+    constructor() {}
 
     // FRE : Exact DT to BT
     function swapExactDatatokenToBaseToken(
@@ -185,9 +179,9 @@ contract FRERouter is ReentrancyGuard, Math {
             .div(10**exchange.btDecimals)
             .div(exchange.fixedRate);
         uint256 marketFee = dtAmountOutSansFee.mul(exchange.marketFee).div(
-            BASE
+            BONE
         );
-        uint256 oceanFee = dtAmountOutSansFee.mul(exchange.oceanFee).div(BASE);
+        uint256 oceanFee = dtAmountOutSansFee.mul(exchange.oceanFee).div(BONE);
         dtAmountOut = dtAmountOutSansFee.sub(marketFee.add(oceanFee));
     }
 
@@ -209,8 +203,8 @@ contract FRERouter is ReentrancyGuard, Math {
             .mul(10**exchange.dtDecimals)
             .div(10**exchange.btDecimals)
             .div(exchange.fixedRate);
-        uint256 marketFee = dtAmountInSansFee.mul(exchange.marketFee).div(BASE);
-        uint256 oceanFee = dtAmountInSansFee.mul(exchange.oceanFee).div(BASE);
+        uint256 marketFee = dtAmountInSansFee.mul(exchange.marketFee).div(BONE);
+        uint256 oceanFee = dtAmountInSansFee.mul(exchange.oceanFee).div(BONE);
         dtAmountIn = dtAmountInSansFee.add(marketFee.add(oceanFee));
     }
 }

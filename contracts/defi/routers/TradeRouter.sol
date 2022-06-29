@@ -3,30 +3,22 @@ pragma solidity >=0.8.0 <0.9.0;
 //SPDX-License-Identifier: BSU-1.1
 
 import "../../interfaces/defi/IAdapter.sol";
-import "../../interfaces/defi/ITradeRouter.sol";
 import "../../interfaces/ocean/IPool.sol";
-import "../../interfaces/ocean/IFactoryRouter.sol";
-import "../../interfaces/ocean/IFixedRateExchange.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../../interfaces/defi/IStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "../utils/Math.sol";
+import "../utils/Fee.sol";
 import "../../interfaces/defi/IPoolRouter.sol";
 import "../../interfaces/defi/IFRERouter.sol";
 import "hardhat/console.sol";
 
-contract TradeRouter is ReentrancyGuard, Math {
+contract TradeRouter is ReentrancyGuard, Fee {
     using SafeMath for uint256;
-    IStorage store;
-    uint8 public version;
-    mapping(address => uint256) public referralFees;
+    using SafeERC20 for IERC20;
+    mapping(address => mapping(address => uint256)) public referralFees;
     string public constant TRADE_FEE_TYPE = "TRADE";
-    uint256 private constant ZERO_FEES = 0;
-    uint256 private constant MAX_INT = 2**256 - 1;
-    uint256 private constant BASE = 1e18;
     IPoolRouter private poolRouter;
     IFRERouter private freRouter;
 
@@ -61,6 +53,12 @@ contract TradeRouter is ReentrancyGuard, Math {
         uint256 amount
     );
 
+    event ReferralFeesClaimed(
+        address indexed referrer,
+        address indexed token,
+        uint256 claimedAmout
+    );
+
     struct Exchange {
         uint256 dtDecimals;
         uint256 btDecimals;
@@ -77,14 +75,7 @@ contract TradeRouter is ReentrancyGuard, Math {
         bytes32 exchangeId;
     }
 
-    constructor(
-        uint8 _version,
-        address _storage,
-        address _poolRouter,
-        address _freRouter
-    ) {
-        version = _version;
-        store = IStorage(_storage);
+    constructor(address _poolRouter, address _freRouter) {
         poolRouter = IPoolRouter(_poolRouter);
         freRouter = IFRERouter(_freRouter);
     }
@@ -121,7 +112,9 @@ contract TradeRouter is ReentrancyGuard, Math {
         uint256 baseAmountIn = baseAmountOutSansFee.sub(dataxFee.add(refFee));
         console.log("TR : baseAmountIn - ", baseAmountIn);
         if (info.meta[2] != address(0)) {
-            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+            referralFees[info.meta[2]][info.meta[5]] = referralFees[
+                info.meta[2]
+            ][info.meta[5]].add(refFee);
         }
         if (info.isFRE) {
             IERC20(info.path[info.path.length - 1]).approve(
@@ -185,7 +178,9 @@ contract TradeRouter is ReentrancyGuard, Math {
         }(info.uints[1], info.path, address(this));
         uint256 baseAmountIn = baseAmountOutSansFee.sub(dataxFee.add(refFee));
         if (info.meta[2] != address(0)) {
-            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+            referralFees[info.meta[2]][info.meta[5]] = referralFees[
+                info.meta[2]
+            ][info.meta[5]].add(refFee);
         }
         if (info.isFRE) {
             IERC20(info.path[info.path.length - 1]).approve(
@@ -268,7 +263,9 @@ contract TradeRouter is ReentrancyGuard, Math {
         }
         uint256 baseAmountIn = baseAmountNeeded.sub(dataxFee.add(refFee));
         if (info.meta[2] != address(0)) {
-            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+            referralFees[info.meta[2]][info.meta[5]] = referralFees[
+                info.meta[2]
+            ][info.meta[5]].add(refFee);
         }
         if (info.isFRE) {
             IERC20(info.path[info.path.length - 1]).approve(
@@ -348,7 +345,9 @@ contract TradeRouter is ReentrancyGuard, Math {
         }
         uint256 baseAmountIn = baseAmountOutSansFee.sub(dataxFee.add(refFee));
         if (info.meta[2] != address(0)) {
-            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+            referralFees[info.meta[2]][info.meta[5]] = referralFees[
+                info.meta[2]
+            ][info.meta[5]].add(refFee);
         }
         if (info.isFRE) {
             IERC20(info.path[info.path.length - 1]).approve(
@@ -439,7 +438,9 @@ contract TradeRouter is ReentrancyGuard, Math {
 
         uint256 baseAmountIn = baseAmountOutSansFee.sub(dataxFee.add(refFee));
         if (info.meta[2] != address(0)) {
-            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+            referralFees[info.meta[2]][info.meta[5]] = referralFees[
+                info.meta[2]
+            ][info.meta[5]].add(refFee);
         }
 
         IAdapter adapter = IAdapter(info.meta[4]);
@@ -514,7 +515,9 @@ contract TradeRouter is ReentrancyGuard, Math {
 
         console.log("TR : baseAmountIn - ", info.uints[1]);
         if (info.meta[2] != address(0)) {
-            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+            referralFees[info.meta[2]][info.meta[5]] = referralFees[
+                info.meta[2]
+            ][info.meta[5]].add(refFee);
         }
 
         IAdapter adapter = IAdapter(info.meta[4]);
@@ -586,7 +589,9 @@ contract TradeRouter is ReentrancyGuard, Math {
 
         tokenAmountOut = baseAmountOutSansFee.sub(dataxFee.add(refFee));
         if (info.meta[2] != address(0)) {
-            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+            referralFees[info.meta[2]][info.meta[5]] = referralFees[
+                info.meta[2]
+            ][info.meta[5]].add(refFee);
         }
 
         if (info.path.length > 1) {
@@ -666,7 +671,9 @@ contract TradeRouter is ReentrancyGuard, Math {
 
         console.log("TR : baseAmountIn - ", info.uints[1]);
         if (info.meta[2] != address(0)) {
-            referralFees[info.meta[2]] = referralFees[info.meta[2]].add(refFee);
+            referralFees[info.meta[2]][info.meta[5]] = referralFees[
+                info.meta[2]
+            ][info.meta[5]].add(refFee);
         }
 
         if (info.path.length > 1) {
@@ -873,26 +880,24 @@ contract TradeRouter is ReentrancyGuard, Math {
         }
     }
 
-    //calculate fees
-    function calcFees(
-        uint256 baseAmount,
-        string memory feeType,
-        uint256 refFeeRate
-    ) public view returns (uint256 dataxFee, uint256 refFee) {
-        uint256 feeRate = store.getFees(feeType);
+    //claim collected Referral fees
+    function claimRefFees(address token, address referrer)
+        external
+        nonReentrant
+        returns (uint256 claimAmount)
+    {
+        IERC20 baseToken = IERC20(token);
+        claimAmount = referralFees[referrer][token];
+        require(claimAmount > 0, "StakeRouter: No tokens to claim");
+        //reset claimable amount
+        referralFees[referrer][token] = 0;
+        //transfer tokens to referrer
         require(
-            refFeeRate <= bsub(BONE, feeRate),
-            "TradeRouter: Ref Fees too high"
+            baseToken.transfer(referrer, claimAmount),
+            "StakeRouter: Referral Token claim failed"
         );
 
-        // DataX Fees
-        if (feeRate != 0) {
-            dataxFee = bsub(baseAmount, bmul(baseAmount, bsub(BONE, feeRate)));
-        }
-        // Referral fees
-        if (refFeeRate != 0) {
-            refFee = bsub(baseAmount, bmul(baseAmount, bsub(BONE, refFeeRate)));
-        }
+        emit ReferralFeesClaimed(referrer, token, claimAmount);
     }
 
     //receive ETH
