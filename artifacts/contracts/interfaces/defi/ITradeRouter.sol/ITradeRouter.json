@@ -1,0 +1,471 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "ITradeRouter",
+  "sourceName": "contracts/interfaces/defi/ITradeRouter.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address[5]",
+              "name": "meta",
+              "type": "address[5]"
+            },
+            {
+              "internalType": "uint256[4]",
+              "name": "uints",
+              "type": "uint256[4]"
+            },
+            {
+              "internalType": "address[]",
+              "name": "path",
+              "type": "address[]"
+            },
+            {
+              "internalType": "bool",
+              "name": "isFRE",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "exchangeId",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct TradeInfo",
+          "name": "info",
+          "type": "tuple"
+        }
+      ],
+      "name": "swapDatatokentoExactDatatoken",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "amounts",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address[5]",
+              "name": "meta",
+              "type": "address[5]"
+            },
+            {
+              "internalType": "uint256[4]",
+              "name": "uints",
+              "type": "uint256[4]"
+            },
+            {
+              "internalType": "address[]",
+              "name": "path",
+              "type": "address[]"
+            },
+            {
+              "internalType": "bool",
+              "name": "isFRE",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "exchangeId",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct TradeInfo",
+          "name": "info",
+          "type": "tuple"
+        }
+      ],
+      "name": "swapDatatokentoExactETH",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "amounts",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address[5]",
+              "name": "meta",
+              "type": "address[5]"
+            },
+            {
+              "internalType": "uint256[4]",
+              "name": "uints",
+              "type": "uint256[4]"
+            },
+            {
+              "internalType": "address[]",
+              "name": "path",
+              "type": "address[]"
+            },
+            {
+              "internalType": "bool",
+              "name": "isFRE",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "exchangeId",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct TradeInfo",
+          "name": "info",
+          "type": "tuple"
+        }
+      ],
+      "name": "swapDatatokentoExactToken",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "amounts",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address[5]",
+              "name": "meta",
+              "type": "address[5]"
+            },
+            {
+              "internalType": "uint256[4]",
+              "name": "uints",
+              "type": "uint256[4]"
+            },
+            {
+              "internalType": "address[]",
+              "name": "path",
+              "type": "address[]"
+            },
+            {
+              "internalType": "bool",
+              "name": "isFRE",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "exchangeId",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct TradeInfo",
+          "name": "info",
+          "type": "tuple"
+        }
+      ],
+      "name": "swapETHToExactDatatoken",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "amountOut",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address[5]",
+              "name": "meta",
+              "type": "address[5]"
+            },
+            {
+              "internalType": "uint256[4]",
+              "name": "uints",
+              "type": "uint256[4]"
+            },
+            {
+              "internalType": "address[]",
+              "name": "path",
+              "type": "address[]"
+            },
+            {
+              "internalType": "bool",
+              "name": "isFRE",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "exchangeId",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct TradeInfo",
+          "name": "info",
+          "type": "tuple"
+        }
+      ],
+      "name": "swapExactDatatokenToDatatoken",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "amounts",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address[5]",
+              "name": "meta",
+              "type": "address[5]"
+            },
+            {
+              "internalType": "uint256[4]",
+              "name": "uints",
+              "type": "uint256[4]"
+            },
+            {
+              "internalType": "address[]",
+              "name": "path",
+              "type": "address[]"
+            },
+            {
+              "internalType": "bool",
+              "name": "isFRE",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "exchangeId",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct TradeInfo",
+          "name": "info",
+          "type": "tuple"
+        }
+      ],
+      "name": "swapExactDatatokensforETH",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "amountOut",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address[5]",
+              "name": "meta",
+              "type": "address[5]"
+            },
+            {
+              "internalType": "uint256[4]",
+              "name": "uints",
+              "type": "uint256[4]"
+            },
+            {
+              "internalType": "address[]",
+              "name": "path",
+              "type": "address[]"
+            },
+            {
+              "internalType": "bool",
+              "name": "isFRE",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "exchangeId",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct TradeInfo",
+          "name": "info",
+          "type": "tuple"
+        }
+      ],
+      "name": "swapExactDatatokentoToken",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "amounts",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address[5]",
+              "name": "meta",
+              "type": "address[5]"
+            },
+            {
+              "internalType": "uint256[4]",
+              "name": "uints",
+              "type": "uint256[4]"
+            },
+            {
+              "internalType": "address[]",
+              "name": "path",
+              "type": "address[]"
+            },
+            {
+              "internalType": "bool",
+              "name": "isFRE",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "exchangeId",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct TradeInfo",
+          "name": "info",
+          "type": "tuple"
+        }
+      ],
+      "name": "swapExactETHToDataToken",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "amountOut",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address[5]",
+              "name": "meta",
+              "type": "address[5]"
+            },
+            {
+              "internalType": "uint256[4]",
+              "name": "uints",
+              "type": "uint256[4]"
+            },
+            {
+              "internalType": "address[]",
+              "name": "path",
+              "type": "address[]"
+            },
+            {
+              "internalType": "bool",
+              "name": "isFRE",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "exchangeId",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct TradeInfo",
+          "name": "info",
+          "type": "tuple"
+        }
+      ],
+      "name": "swapExactTokenToDataToken",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "amounts",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address[5]",
+              "name": "meta",
+              "type": "address[5]"
+            },
+            {
+              "internalType": "uint256[4]",
+              "name": "uints",
+              "type": "uint256[4]"
+            },
+            {
+              "internalType": "address[]",
+              "name": "path",
+              "type": "address[]"
+            },
+            {
+              "internalType": "bool",
+              "name": "isFRE",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "exchangeId",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct TradeInfo",
+          "name": "info",
+          "type": "tuple"
+        }
+      ],
+      "name": "swapTokentoExactDatatoken",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "amounts",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

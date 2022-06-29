@@ -1,0 +1,316 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "IFixedRateExchange",
+  "sourceName": "contracts/interfaces/ocean/IFixedRateExchange.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "exchangeId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "datatokenAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "maxBaseTokenAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "consumeMarketAddress",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "consumeMarketSwapFeeAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "buyDT",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "exchangeId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "datatokenAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "consumeMarketSwapFeeAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "calcBaseInGivenOutDT",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "baseTokenAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "oceanFeeAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "publishMarketFeeAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "consumeMarketFeeAmount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "exchangeId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "datatokenAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "consumeMarketSwapFeeAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "calcBaseOutGivenInDT",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "baseTokenAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "oceanFeeAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "publishMarketFeeAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "consumeMarketFeeAmount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "exchangeId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getAllowedSwapper",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "exchangeId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getExchange",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "exchangeOwner",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "datatoken",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "dtDecimals",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "baseToken",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "btDecimals",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "fixedRate",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "active",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "dtSupply",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "btSupply",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "dtBalance",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "btBalance",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "withMint",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "exchangeId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getFeesInfo",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "marketFee",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "marketFeeCollector",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "opcFee",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "marketFeeAvailable",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "oceanFeeAvailable",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "exchangeId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getRate",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "exchangeId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "datatokenAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "minBaseTokenAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "consumeMarketAddress",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "consumeMarketSwapFeeAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "sellDT",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
