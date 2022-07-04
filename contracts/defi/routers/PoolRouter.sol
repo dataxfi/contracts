@@ -2,16 +2,15 @@ pragma solidity >=0.8.0 <0.9.0;
 //Copyright of DataX Protocol contributors
 //SPDX-License-Identifier: BSU-1.1
 
-import "../../interfaces/defi/IAdapter.sol";
-import "../../interfaces/ocean/IPool.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "../utils/Math.sol";
+import "../../interfaces/defi/IAdapter.sol";
+import "../../interfaces/ocean/IPool.sol";
+import "../utils/Const.sol";
 import "hardhat/console.sol";
 
-contract PoolRouter is ReentrancyGuard, Math {
+contract PoolRouter is ReentrancyGuard, Const {
     using SafeMath for uint256;
 
     constructor() {}

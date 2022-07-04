@@ -2,16 +2,13 @@ pragma solidity >=0.8.0 <0.9.0;
 //Copyright of DataX Protocol contributors
 //SPDX-License-Identifier: BSU-1.1
 
-import "../../interfaces/ocean/IFixedRateExchange.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "../utils/Math.sol";
-import "hardhat/console.sol";
+import "../../interfaces/ocean/IFixedRateExchange.sol";
+import "../utils/Const.sol";
 
-contract FRERouter is ReentrancyGuard, Math {
+contract FRERouter is ReentrancyGuard, Const {
     using SafeMath for uint256;
     struct Exchange {
         uint256 dtDecimals;
@@ -20,8 +17,6 @@ contract FRERouter is ReentrancyGuard, Math {
         uint256 marketFee;
         uint256 oceanFee;
     }
-
-    constructor() {}
 
     // FRE : Exact DT to BT
     function swapExactDatatokenToBaseToken(
@@ -150,8 +145,6 @@ contract FRERouter is ReentrancyGuard, Math {
         bytes32 exchangeId,
         uint256 dtAmountIn
     ) public view returns (uint256 baseAmountOut) {
-        console.log("FRE Exchange ID ");
-        console.logBytes32(exchangeId);
         IFixedRateExchange fre = IFixedRateExchange(exchangeAddress);
         (baseAmountOut, , , ) = fre.calcBaseOutGivenInDT(
             exchangeId,

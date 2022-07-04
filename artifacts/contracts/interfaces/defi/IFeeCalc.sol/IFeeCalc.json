@@ -1,0 +1,45 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "IFeeCalc",
+  "sourceName": "contracts/interfaces/defi/IFeeCalc.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "baseAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "feeType",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "refFeeRate",
+          "type": "uint256"
+        }
+      ],
+      "name": "calcFees",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "dataxFee",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "refFee",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

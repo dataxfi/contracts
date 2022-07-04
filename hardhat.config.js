@@ -45,5 +45,9 @@ module.exports = {
     apiKey: process.env.ETHSCAN_KEY
   },
   solidity: '0.8.12',
+  optimizer: {
+    enabled: true,
+    runs: 500
+  }
 
 }

@@ -1,0 +1,9 @@
+{
+    "polygon": {
+        "Adapter": "0x561B76721FD24f0b7E8B5585C3e0897EA4461469",
+        "feeAdmin": "0x66F3E55e6247E3Ca0a865080EE03fC366bdD21De",
+        "FeeCalc": "0xF359567618fFE127480dDfa6bfc2b20F74ed16A3",
+        "StakeCalc": "0x205a27126803dEFbA3D77697b58355d14c8D8371",
+        "StakeRouter": "0xDb7406af12116E7932ad0c1b6EE0f12076c28442"
+    }
+}

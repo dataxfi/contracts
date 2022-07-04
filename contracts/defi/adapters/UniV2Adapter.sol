@@ -2,17 +2,15 @@ pragma solidity >=0.8.0 <0.9.0;
 // Copyright DataX Protocol contributors
 //SPDX-License-Identifier: BSU-1.1
 
-import "../../interfaces/defi/IUniV2Router02.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "hardhat/console.sol";
+import "../../interfaces/defi/IUniV2Router02.sol";
 
 contract UniV2Adapter {
     IUniswapV2Router02 uniswapRouter;
-    using SafeERC20 for ERC20;
+    using SafeERC20 for IERC20;
     using SafeMath for uint256;
     uint256 private constant DEADLINE = 600; //10 mins
 
@@ -122,10 +120,7 @@ contract UniV2Adapter {
         refund = amountInMax.sub(amounts[0]);
 
         //refund remaining tokens
-        require(
-            IERC20(path[0]).transfer(refundTo, refund),
-            "UniV2Adapter: Token refund failed"
-        );
+        IERC20(path[0]).safeTransfer(refundTo, refund);
     }
 
     /** @dev swaps Exact Tokens for ETH
@@ -245,10 +240,7 @@ contract UniV2Adapter {
         tokenAmountOut = amounts[amounts.length - 1];
         refund = amountInMax.sub(amounts[0]);
         //refund remaining tokens
-        require(
-            IERC20(path[0]).transfer(refundTo, refund),
-            "UniV2Adapter: Token refund failed"
-        );
+        IERC20(path[0]).safeTransfer(refundTo, refund);
     }
 
     function getAmountsOut(uint256 amountIn, address[] memory path)
