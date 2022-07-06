@@ -118,7 +118,7 @@ contract StakeRouter is ReentrancyGuard, Const, Admin {
         // actual base amount minus fees
         uint256 baseAmountOut = baseAmountOutSansFee.sub(dataxFee.add(refFee));
         //approve Pool to spend base token
-        baseToken.safeApprove(address(pool), baseAmountOut);
+        baseToken.safeIncreaseAllowance(address(pool), baseAmountOut);
 
         //stake tokens in Pool
         poolTokensOut = pool.joinswapExternAmountIn(
@@ -164,7 +164,11 @@ contract StakeRouter is ReentrancyGuard, Const, Admin {
             address(this),
             info.uints[0]
         );
-        IERC20(info.meta[0]).safeApprove(address(pool), info.uints[0]);
+
+        IERC20(info.meta[0]).safeIncreaseAllowance(
+            address(pool),
+            info.uints[0]
+        );
 
         //unstake baseToken from Pool
         uint256 baseAmountOutSansFee = pool.exitswapPoolAmountIn(
@@ -195,7 +199,7 @@ contract StakeRouter is ReentrancyGuard, Const, Admin {
         // actual base amount minus fees
         uint256 baseAmountOut = baseAmountOutSansFee.sub(dataxFee.add(refFee));
 
-        baseToken.safeApprove(info.meta[3], baseAmountOut);
+        baseToken.safeIncreaseAllowance(info.meta[3], baseAmountOut);
 
         //swap to output token
         IAdapter adapter = IAdapter(info.meta[3]);
@@ -257,7 +261,10 @@ contract StakeRouter is ReentrancyGuard, Const, Admin {
                 info.path
             );
 
-            IERC20(info.path[0]).safeApprove(info.meta[3], info.uints[0]);
+            IERC20(info.path[0]).safeIncreaseAllowance(
+                info.meta[3],
+                info.uints[0]
+            );
             baseAmountOutSansFee = adapter.swapExactTokensForTokens(
                 info.uints[0],
                 amounts[info.path.length - 1],
@@ -292,7 +299,7 @@ contract StakeRouter is ReentrancyGuard, Const, Admin {
         //handle Pool swap
         IPool pool = IPool(info.meta[0]);
         //approve Pool to spend base token
-        baseToken.safeApprove(info.meta[0], baseAmountOut);
+        baseToken.safeIncreaseAllowance(info.meta[0], baseAmountOut);
 
         //stake tokens in Pool
         poolTokensOut = pool.joinswapExternAmountIn(
@@ -336,7 +343,10 @@ contract StakeRouter is ReentrancyGuard, Const, Admin {
             address(this),
             info.uints[0]
         );
-        IERC20(info.meta[0]).safeApprove(address(pool), info.uints[0]);
+        IERC20(info.meta[0]).safeIncreaseAllowance(
+            address(pool),
+            info.uints[0]
+        );
 
         //unstake baseToken from Pool
         uint256 baseAmountOutSansFee = pool.exitswapPoolAmountIn(
@@ -371,7 +381,7 @@ contract StakeRouter is ReentrancyGuard, Const, Admin {
 
         //skip if tokenOut is the baseToken
         if (info.path.length > 1) {
-            baseToken.safeApprove(info.meta[3], baseAmountOut);
+            baseToken.safeIncreaseAllowance(info.meta[3], baseAmountOut);
             //swap to output token
             IAdapter adapter = IAdapter(info.meta[3]);
             //swap basetoken to Destination token

@@ -5,10 +5,11 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./FeeAdmin.sol";
-import "./Const.sol";
+import "./Math.sol";
 import "./Admin.sol";
+import "hardhat/console.sol";
 
-contract FeeCalc is Const {
+contract FeeCalc is Math {
     FeeAdmin fee;
     using SafeMath for uint256;
 
@@ -23,14 +24,23 @@ contract FeeCalc is Const {
     ) public view returns (uint256 dataxFee, uint256 refFee) {
         uint256 feeRate = fee.getFees(feeType);
         require(refFeeRate <= BONE.sub(feeRate), "Fee: Ref Fees too high");
-
+        console.log("WE are OKAY");
         // DataX Fees
         if (feeRate != 0) {
-            dataxFee = baseAmount.sub(baseAmount.mul(BONE.sub(feeRate)));
+            dataxFee = bsub(
+                baseAmount,
+                (bmul(baseAmount, (bsub(BONE, feeRate))))
+            );
+            console.log("WE managed DATAX fees");
         }
         // Referral fees
         if (refFeeRate != 0) {
-            refFee = baseAmount.sub(baseAmount.mul(BONE.sub(refFeeRate)));
+            refFee = bsub(
+                baseAmount,
+                (bmul(baseAmount, (bsub(BONE, refFeeRate))))
+            );
+            console.log("WE managed REF fees");
         }
+        console.log("WE are all good");
     }
 }

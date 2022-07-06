@@ -24,9 +24,9 @@ module.exports = {
     hardhat: {
       forking: {
         url: "https://polygon-mainnet.g.alchemy.com/v2/9NFuHnOvVLrD3QiASu65G4fqh9AiDZl5",
-        blockNumber: 29675155
+        blockNumber: 30407350 //29675155
       },
-      allowUnlimitedContractSize: true
+      allowUnlimitedContractSize: false
     },
    polygon: {
      chainId: 137,

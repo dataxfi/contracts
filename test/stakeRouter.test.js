@@ -9,7 +9,9 @@ use(solidity);
 
 const chainId = process.env.chainId;
 let owner, staker, beneficiary, referrer;
-let storage;
+let feeAdmin;
+let feeCalc;
+let stakeCalc;
 let stakeRouter;
 let adapter;
 let oceanToken;
@@ -41,20 +43,26 @@ describe.only("Test Stake Router contract", function () {
   before("Prepare test environment", async function () {
     console.log("Chain ID - ", process.env.chainId);
     [owner, beneficiary, referrer] = await ethers.getSigners();
-    const Storage = await ethers.getContractFactory("Storage");
-    storage = await Storage.deploy();
-    const admin = await storage.admin();
-    console.log('Admin - ', admin);
-    console.log('Owner - ', owner.address);
-    expect(admin).to.equal(owner.address);
+
 
     const Adapter = await ethers.getContractFactory("UniV2Adapter");
-    adapter = await Adapter.deploy(UNIV2ROUTER_ADDRESS, VERSION);
-    expect(await adapter.version()).to.equal(VERSION);
+    adapter = await Adapter.deploy(UNIV2ROUTER_ADDRESS);
+
+    const FeeAdmin = await ethers.getContractFactory("FeeAdmin");
+    feeAdmin = await FeeAdmin.deploy();
+    console.log("FeeAdmin address:", feeAdmin.address);
+
+    const FeeCalc = await ethers.getContractFactory("FeeCalc");
+    feeCalc = await FeeCalc.deploy(feeAdmin.address);
+    console.log("FeeCalc address:", feeCalc.address);
+
+    const StakeCalc = await ethers.getContractFactory("StakeCalc");
+    stakeCalc = await StakeCalc.deploy(feeCalc.address);
+    console.log("StakeCalc address:", stakeCalc.address);
 
     const StakeRouter = await ethers.getContractFactory("StakeRouter");
-    stakeRouter = await StakeRouter.deploy(VERSION, storage.address); 
-    expect(await stakeRouter.version()).to.equal(VERSION);
+    stakeRouter = await StakeRouter.deploy(feeCalc.address); 
+    console.log("StakeRouter address:", stakeRouter.address);
 
     oceanToken = await ethers.getContractAt("IERC20V1", OCEAN_ADDRESS);
     usdtToken = await ethers.getContractAt("IERC20V1", USDT_ADDRESS);
@@ -68,10 +76,9 @@ describe.only("Test Stake Router contract", function () {
   it("stake OCEAN tokens", async () => {
 
     let amountToStake = ethers.utils.parseEther('10');
-    console.log("Stake Router version - ", await stakeRouter.version());
-    console.log("adapter address - ", adapter.address);
-    let preCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],["0",REF_FEES, amountToStake],[OCEAN_ADDRESS]];
-    let result = await stakeRouter.calcPoolOutGivenTokenIn(preCalcInfo);
+    console.log("StakeCalc address - ", stakeCalc.address);
+    let preCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[amountToStake,REF_FEES, "0"],[OCEAN_ADDRESS]];
+    let result = await stakeCalc.calcPoolOutGivenTokenIn(preCalcInfo);
     let poolAmountOut = result.poolAmountOut.toString();
     console.log("Pool Amount Out - ", poolAmountOut);
     let dataxFee = result.dataxFee;
@@ -91,11 +98,11 @@ describe.only("Test Stake Router contract", function () {
     console.log("Allowance - ", allowance.toString());
     expect(allowance).to.equal(amountToStake);
 
-    let postCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[poolAmountOut, REF_FEES, amountToStake],[OCEAN_ADDRESS]];
+    let postCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[amountToStake,REF_FEES, poolAmountOut],[OCEAN_ADDRESS]];
     let stakeRes = await stakeRouter.connect(staker).stakeTokenInDTPool(postCalcInfo);
-    //let actualPoolTokensOut = stakeRes.poolTokensOut.toString();
-    //console.log(" Actual Pool Tokens Out  - ", actualPoolTokensOut);
+  
     let actualPoolTokensOut = (await pool.balanceOf(staker.address)).toString();
+    console.log(" Actual Pool Tokens Out  - ", actualPoolTokensOut);
     console.log("Pool Shares - ", actualPoolTokensOut);
     expect(actualPoolTokensOut).to.equal(poolAmountOut);
 
@@ -105,8 +112,8 @@ describe.only("Test Stake Router contract", function () {
 
     let poolSharesToUnstake = await pool.balanceOf(staker.address);
     console.log("Staker Pool Share Balance - ", poolSharesToUnstake.toString());
-    let preCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],["0", REF_FEES, poolSharesToUnstake],[OCEAN_ADDRESS]];
-    let result = await stakeRouter.calcTokenOutGivenPoolIn(preCalcInfo);
+    let preCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[poolSharesToUnstake, REF_FEES, "0"],[OCEAN_ADDRESS]];
+    let result = await stakeCalc.calcTokenOutGivenPoolIn(preCalcInfo);
     let oceanOut = result.baseAmountOut;
     console.log("Expected OCEAN Amount Out - ", ethers.utils.formatUnits(oceanOut, 'wei'));
     let dataxFee = result.dataxFee;
@@ -119,7 +126,7 @@ describe.only("Test Stake Router contract", function () {
     await pool.connect(staker).approve(stakeRouter.address, poolSharesToUnstake);
     
     //prepare data to send to unstake function
-    let postCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[oceanOut, REF_FEES, poolSharesToUnstake],[OCEAN_ADDRESS]];
+    let postCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[poolSharesToUnstake, REF_FEES, oceanOut],[OCEAN_ADDRESS]];
     //check if unstaking was successful
     let oceanBalPreUnstake = await oceanToken.balanceOf(staker.address);
     console.log("OCEAN balance before unstaking - ", oceanBalPreUnstake.toString());
@@ -137,8 +144,8 @@ describe.only("Test Stake Router contract", function () {
   it("stake ETH", async () => {
 
     let amountToStake = ethers.utils.parseEther('1');
-    let preCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],["0", REF_FEES, amountToStake],[WETH_ADDRESS, OCEAN_ADDRESS]];
-    let result = await stakeRouter.calcPoolOutGivenTokenIn(preCalcInfo);
+    let preCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[amountToStake, REF_FEES, "0"],[WETH_ADDRESS, OCEAN_ADDRESS]];
+    let result = await stakeCalc.calcPoolOutGivenTokenIn(preCalcInfo);
     let poolAmountOut = result.poolAmountOut.toString();
     console.log("Expected Pool Amount Out - ", poolAmountOut);
     let dataxFee = result.dataxFee;
@@ -155,7 +162,7 @@ describe.only("Test Stake Router contract", function () {
     await oceanToken.connect(staker).approve(stakeRouter.address, amountToStake);
     
     //prepare data to send to stake function
-    let postCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[poolAmountOut,REF_FEES, amountToStake],[WETH_ADDRESS, OCEAN_ADDRESS]];
+    let postCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[amountToStake,REF_FEES, poolAmountOut],[WETH_ADDRESS, OCEAN_ADDRESS]];
     //stake ETH in datapool 
     await stakeRouter.connect(staker).stakeETHInDTPool(postCalcInfo, {value: amountToStake});
     //check if staking was successful
@@ -173,8 +180,8 @@ describe.only("Test Stake Router contract", function () {
 
     let poolSharesToUnstake = await pool.balanceOf(staker.address);
     console.log("Staker Pool Share Balance - ", poolSharesToUnstake.toString());
-    let preCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],["0", REF_FEES, poolSharesToUnstake],[OCEAN_ADDRESS, WETH_ADDRESS]];
-    let result = await stakeRouter.calcTokenOutGivenPoolIn(preCalcInfo);
+    let preCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[poolSharesToUnstake, REF_FEES, "0"],[OCEAN_ADDRESS, WETH_ADDRESS]];
+    let result = await stakeCalc.calcTokenOutGivenPoolIn(preCalcInfo);
     let ethOut = result.baseAmountOut;
     console.log("Expected ETH Amount Out - ", ethers.utils.formatUnits(ethOut, 'wei'));
     let dataxFee = result.dataxFee;
@@ -187,7 +194,7 @@ describe.only("Test Stake Router contract", function () {
     await pool.connect(staker).approve(stakeRouter.address, poolSharesToUnstake);
     
     //prepare data to send to unstake function
-    let postCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[ethOut, REF_FEES, poolSharesToUnstake],[OCEAN_ADDRESS, WETH_ADDRESS]];
+    let postCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[poolSharesToUnstake, REF_FEES, ethOut],[OCEAN_ADDRESS, WETH_ADDRESS]];
      //check if unstaking was successful
     let ethBalPreUnstake = await ethers.getDefaultProvider(PROVIDER).getBalance(staker.address);
     console.log("Actual ETH before unstaking - ", ethBalPreUnstake.toString());
@@ -207,14 +214,16 @@ describe.only("Test Stake Router contract", function () {
 
     let amountToStake = ethers.utils.parseUnits('10', 'mwei');
     console.log("adapter address - ", adapter.address);
-    let preCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],["0",REF_FEES, amountToStake],[USDT_ADDRESS, WETH_ADDRESS, OCEAN_ADDRESS]];
-    let result = await stakeRouter.calcPoolOutGivenTokenIn(preCalcInfo);
+    let preCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[amountToStake,REF_FEES, "0"],[USDT_ADDRESS, WETH_ADDRESS, OCEAN_ADDRESS]];
+    console.log(preCalcInfo.toString());
+    let result = await stakeCalc.calcPoolOutGivenTokenIn(preCalcInfo);
+    console.log(result);
     let poolAmountOut = result.poolAmountOut.toString();
     console.log("Pool Amount Out - ", poolAmountOut);
     let dataxFee = result.dataxFee;
     console.log("DataX Fee - ", dataxFee.toString());
     let refFee = result.refFee;
-    console.log(" Ref Fee - ", refFee);
+    console.log(" Ref Fee - ", refFee.toString());
     totalRefFee = totalRefFee.add(refFee);
 
     console.log("Staker Address - ", staker.address);
@@ -228,11 +237,11 @@ describe.only("Test Stake Router contract", function () {
     console.log("Allowance - ", allowance.toString());
     expect(allowance).to.equal(amountToStake);
 
-    let postCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[poolAmountOut, REF_FEES, amountToStake],[USDT_ADDRESS, WETH_ADDRESS, OCEAN_ADDRESS]];
+    let postCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[amountToStake,REF_FEES, poolAmountOut],[USDT_ADDRESS, WETH_ADDRESS, OCEAN_ADDRESS]];
     let stakeRes = await stakeRouter.connect(staker).stakeTokenInDTPool(postCalcInfo);
-    //let actualPoolTokensOut = stakeRes.poolTokensOut.toString();
-    //console.log(" Actual Pool Tokens Out  - ", actualPoolTokensOut);
+    
     let actualPoolTokensOut = (await pool.balanceOf(staker.address)).toString();
+    console.log(" Actual Pool Tokens Out  - ", actualPoolTokensOut);
     console.log("Pool Shares - ", actualPoolTokensOut);
     expect(actualPoolTokensOut).to.equal(poolAmountOut);
 
@@ -242,8 +251,8 @@ describe.only("Test Stake Router contract", function () {
 
     let poolSharesToUnstake = await pool.balanceOf(staker.address);
     console.log("Staker Pool Share Balance - ", poolSharesToUnstake.toString());
-    let preCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],["0", REF_FEES, poolSharesToUnstake],[OCEAN_ADDRESS, WETH_ADDRESS, USDT_ADDRESS]];
-    let result = await stakeRouter.calcTokenOutGivenPoolIn(preCalcInfo);
+    let preCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[poolSharesToUnstake, REF_FEES, "0"],[OCEAN_ADDRESS, WETH_ADDRESS, USDT_ADDRESS]];
+    let result = await stakeCalc.calcTokenOutGivenPoolIn(preCalcInfo);
     let usdtOut = result.baseAmountOut;
     console.log("Expected USDT Amount Out - ", ethers.utils.formatUnits(usdtOut, 'wei'));
     let dataxFee = result.dataxFee;
@@ -256,7 +265,7 @@ describe.only("Test Stake Router contract", function () {
     await pool.connect(staker).approve(stakeRouter.address, poolSharesToUnstake);
     
     //prepare data to send to unstake function
-    let postCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[usdtOut, REF_FEES, poolSharesToUnstake],[OCEAN_ADDRESS, WETH_ADDRESS, USDT_ADDRESS]];
+    let postCalcInfo =[[POOL_ADDRESS, staker.address, referrer.address, adapter.address],[poolSharesToUnstake, REF_FEES, usdtOut],[OCEAN_ADDRESS, WETH_ADDRESS, USDT_ADDRESS]];
     //check if unstaking was successful
     let usdtBalPreUnstake = await usdtToken.balanceOf(staker.address);
     console.log("USDT balance before unstaking - ", usdtBalPreUnstake.toString());
